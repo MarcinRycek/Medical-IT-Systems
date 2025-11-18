@@ -84,10 +84,8 @@ class RegisterWindow(QWidget):
                 self.show_error_popup("Taki login już istnieje!")
                 return
 
-            # Hashowanie hasła
             hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-            # Dodanie nowego użytkownika do bazy danych
             cursor.execute(
                 "INSERT INTO users (id, login, password, role) VALUES (%s, %s, %s, %s)",
                 (pesel, login, hashed, role)
@@ -95,7 +93,6 @@ class RegisterWindow(QWidget):
 
             conn.commit()
 
-            # Automatyczne logowanie po rejestracji
             self.login_user(login, password)
 
         except Exception as e:
@@ -122,7 +119,7 @@ class RegisterWindow(QWidget):
 
             if bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8")):
                 self.show_success_popup(f"Dzień dobry, {login}!")
-                self.open_main_window()  # Przejście do głównego okna
+                self.open_main_window()
             else:
                 self.show_error_popup("Niepoprawne hasło.")
 
@@ -141,7 +138,7 @@ class RegisterWindow(QWidget):
         QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
 
     def open_main_window(self):
-        from MainWindow import MainWindow  # Importujemy główne okno
+        from MainWindow import MainWindow
         self.close()
         self.main_window = MainWindow()
         self.main_window.show()

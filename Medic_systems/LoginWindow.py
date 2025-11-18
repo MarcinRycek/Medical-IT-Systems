@@ -58,8 +58,8 @@ class LoginWindow(QWidget):
 
     def login_user(self):
         try:
-            conn = psycopg2.connect(conn_str)
-            cursor = conn.cursor()
+            self.conn = psycopg2.connect(conn_str)
+            cursor = self.conn.cursor()
 
             cursor.execute("SELECT password, role FROM users WHERE login = %s", (self.login_box.text(),))
             result = cursor.fetchone()
@@ -72,7 +72,7 @@ class LoginWindow(QWidget):
 
             if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
                 self.show_success_popup()
-                self.open_main_window()  # Otwieramy główne okno po udanym logowaniu
+                self.open_main_window()
             else:
                 self.show_error_popup("Niepoprawne hasło.")
 
@@ -82,7 +82,7 @@ class LoginWindow(QWidget):
         finally:
             if 'conn' in locals():
                 cursor.close()
-                conn.close()
+                self.conn.close()
 
     def show_success_popup(self):
         QMessageBox.information(self, "Zalogowano Pomyślnie!", f"Dzień dobry, {self.login_box.text()}!", QMessageBox.Ok)
@@ -93,5 +93,5 @@ class LoginWindow(QWidget):
     def open_main_window(self):
         from MainWindow import MainWindow
         self.close()
-        self.main_window = MainWindow()
+        self.main_window = MainWindow(self.conn)
         self.main_window.show()
