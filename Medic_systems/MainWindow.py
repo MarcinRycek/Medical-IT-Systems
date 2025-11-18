@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtGui import QColor, QPalette, qRgb
 
 class VisitDetailsWindow(QDialog):
-    def __init__(self, data_wizyty, tytul_wizyty, lekarz,result, parent=None):
+    def __init__(self, data_wizyty, tytul_wizyty, lekarz, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Szczegóły Wizyty: {tytul_wizyty}")
         self.setGeometry(300, 300, 600, 400)
@@ -15,7 +15,6 @@ class VisitDetailsWindow(QDialog):
         layout.addWidget(QLabel(f"<b>Data:</b> {data_wizyty}", self))
         layout.addWidget(QLabel(f"<b>Tytuł:</b> {tytul_wizyty}", self))
         layout.addWidget(QLabel(f"<b>Doktor/Laborant:</b> {lekarz}", self))
-        QMessageBox.critical(self, "Błąd", result, QMessageBox.Ok)
         close_button = QPushButton("Zamknij", self)
         close_button.clicked.connect(self.accept)
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
@@ -24,7 +23,10 @@ class VisitDetailsWindow(QDialog):
 class MainWindow(QWidget):
     def __init__(self,conn):
         super().__init__()
-
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT login FROM users")
+        result = cursor.fetchone()
+        QMessageBox.critical(self, "Błąd", result, QMessageBox.Ok)
         self.setWindowTitle("MedEX-POL")
         self.setGeometry(100, 100, 1200, 700)
         self.set_palette()
@@ -89,16 +91,14 @@ class MainWindow(QWidget):
 
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
-    def _show_visit_details(self):
+    def _show_visit_details(self,conn):
         if not self.current_selected_data:
             QMessageBox.warning(self, "Błąd", "Proszę wybrać wizytę z listy.")
             return
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT login FROM users")
-        result = cursor.fetchone()
+
         data, tytul, lekarz = self.current_selected_data
 
-        details_window = VisitDetailsWindow(data, tytul, lekarz,result, self)
+        details_window = VisitDetailsWindow(data, tytul, lekarz, self)
         details_window.exec()
 
     def set_palette(self):
