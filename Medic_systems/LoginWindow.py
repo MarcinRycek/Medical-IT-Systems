@@ -93,5 +93,5 @@ class LoginWindow(QWidget):
     def open_main_window(self):
         from MainWindow import MainWindow
         self.close()
-        self.main_window = MainWindow(self.conn)
+        self.main_window = MainWindow()
         self.main_window.show()

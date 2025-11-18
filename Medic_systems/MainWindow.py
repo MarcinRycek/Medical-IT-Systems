@@ -21,12 +21,8 @@ class VisitDetailsWindow(QDialog):
 
 
 class MainWindow(QWidget):
-    def __init__(self,conn):
+    def __init__(self):
         super().__init__()
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT login FROM users")
-        result = cursor.fetchone()
-        QMessageBox.critical(self, "Błąd", result, QMessageBox.Ok)
         self.setWindowTitle("MedEX-POL")
         self.setGeometry(100, 100, 1200, 700)
         self.set_palette()
