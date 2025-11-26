@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QListWidget, QSizePolicy, \
-    QListWidgetItem, QDialog, QMessageBox
+    QListWidgetItem, QDialog, QMessageBox, QLineEdit
 from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtGui import QColor, QPalette, qRgb
 
@@ -19,6 +19,75 @@ class VisitDetailsWindow(QDialog):
         close_button.clicked.connect(self.accept)
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
+
+class AddVisitWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Dodaj Nową Wizytę")
+        self.setGeometry(300, 300, 600, 400)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(f"<h2>Dodaj Nową Wizytę</h2>", self))
+        layout.addWidget(QLabel(f"<b>Wprowadź dane wizyty:</b>", self))
+
+        # Add your input fields here for a new visit
+        # For example:
+        self.date_input = QLineEdit(self)
+        self.title_input = QLineEdit(self)
+        self.doctor_input = QLineEdit(self)
+
+        layout.addWidget(QLabel("Data:", self))
+        layout.addWidget(self.date_input)
+        layout.addWidget(QLabel("Tytuł:", self))
+        layout.addWidget(self.title_input)
+        layout.addWidget(QLabel("Doktor/Laborant:", self))
+        layout.addWidget(self.doctor_input)
+
+        add_button = QPushButton("Dodaj Wizytę", self)
+        add_button.clicked.connect(self._add_visit)
+        layout.addWidget(add_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        close_button = QPushButton("Zamknij", self)
+        close_button.clicked.connect(self.reject)
+        layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+    def _add_visit(self):
+        # Show a message box when the "Dodaj Wizytę" button is clicked
+        QMessageBox.information(self, "Dodaj Wizytę", "Wizytę została dodana (placeholder).")
+
+        self.accept()  # Close the window after showing the message box
+
+
+class LogoutWindow(QDialog):
+    def __init__(self, parent=None, on_logged_out=None):
+        super().__init__(parent)
+        self.setWindowTitle("Wylogowanie")
+        self.setGeometry(300, 300, 600, 400)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("<h2>Potwierdzenie Wylogowania</h2>", self))
+        layout.addWidget(QLabel("<b>Czy na pewno chcesz się wylogować?</b>", self))
+
+        logout_button = QPushButton("Wyloguj", self)
+        logout_button.clicked.connect(self._logout)
+        layout.addWidget(logout_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        cancel_button = QPushButton("Anuluj", self)
+        cancel_button.clicked.connect(self.reject)
+        layout.addWidget(cancel_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self.on_logged_out = on_logged_out  # Callback function to handle logout event
+
+    def _logout(self):
+        # Show a message box when the "Wyloguj" button is clicked in the confirmation window
+        QMessageBox.information(self, "Wylogowanie", "Zostałeś wylogowany.")
+
+        # Close the LogoutWindow and MainWindow after message box is closed
+        self.accept()  # Close the LogoutWindow
+
+        # Close the MainWindow (if it exists) and show the LoginWindow
+        if self.on_logged_out:
+            self.on_logged_out()  # Call the callback to handle the logout in the main window
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -49,8 +118,8 @@ class MainWindow(QWidget):
         side_layout.addStretch(1)
 
         zobacz_wizyte_btn.clicked.connect(self._show_visit_details)
-        dodaj_wizyte_btn.clicked.connect(self._show_message)
-        wyloguj_btn.clicked.connect(self._show_message)
+        dodaj_wizyte_btn.clicked.connect(self._show_add_visit_window)
+        wyloguj_btn.clicked.connect(self._show_logout_window)
 
         main_content_frame = QFrame(self)
         main_content_frame.setStyleSheet("background-color: rgb(172, 248, 122);")
@@ -89,13 +158,23 @@ class MainWindow(QWidget):
 
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
-    def _show_message(self):
-        # Get the text from the button and show it in a message box
-        sender = self.sender()
-        text = sender.text()
-        QMessageBox.information(self, "Informacja", text)
+    def _show_add_visit_window(self):
+        # Open the "Dodaj Nową Wizytę" window
+        add_visit_window = AddVisitWindow(self)
+        add_visit_window.exec()
 
-    def _show_visit_details(self, conn):
+    def _show_logout_window(self):
+        # Open the "Wylogowanie" confirmation window
+        logout_window = LogoutWindow(self, self._handle_logged_out)
+        logout_window.exec()
+
+    def _handle_logged_out(self):
+        from LoginWindow import LoginWindow
+        self.close()
+        self.login_window = LoginWindow()
+        self.login_window.show()
+
+    def _show_visit_details(self):
         if not self.current_selected_data:
             QMessageBox.warning(self, "Błąd", "Proszę wybrać wizytę z listy.")
             return
