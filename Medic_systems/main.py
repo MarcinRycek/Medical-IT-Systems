@@ -2,12 +2,12 @@ import psycopg2
 from PySide6.QtWidgets import QApplication
 import sys
 from LoginWindow import LoginWindow
-from MainWindow import MainWindow
+from LoginWindow import LoginWindow
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    window = MainWindow()
+    window = LoginWindow()
     window.show()
 
     app.exec()

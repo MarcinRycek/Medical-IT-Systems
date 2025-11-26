@@ -43,11 +43,14 @@ class MainWindow(QWidget):
         side_layout.setContentsMargins(20, 150, 20, 20)
 
         zobacz_wizyte_btn = self.add_button(side_layout, "zobacz wizytę")
-        self.add_button(side_layout, "dodaj nową wizytę")
+        dodaj_wizyte_btn = self.add_button(side_layout, "dodaj nową wizytę")
+        wyloguj_btn = self.add_button(side_layout, "wyloguj")
+
         side_layout.addStretch(1)
-        self.add_button(side_layout, "wyloguj")
 
         zobacz_wizyte_btn.clicked.connect(self._show_visit_details)
+        dodaj_wizyte_btn.clicked.connect(self._show_message)
+        wyloguj_btn.clicked.connect(self._show_message)
 
         main_content_frame = QFrame(self)
         main_content_frame.setStyleSheet("background-color: rgb(172, 248, 122);")
@@ -74,7 +77,6 @@ class MainWindow(QWidget):
         self.setLayout(main_h_layout)
 
     def _handle_item_clicked(self, item):
-
         if self.current_selected_frame:
             idx = self.lista_wizyt.row(self.lista_wizyt.itemAt(self.current_selected_frame.pos()))
             original_style = "background-color: #D3D3D3;" if idx % 2 == 0 else "background-color: #C4C4C4;"
@@ -87,7 +89,13 @@ class MainWindow(QWidget):
 
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
-    def _show_visit_details(self,conn):
+    def _show_message(self):
+        # Get the text from the button and show it in a message box
+        sender = self.sender()
+        text = sender.text()
+        QMessageBox.information(self, "Informacja", text)
+
+    def _show_visit_details(self, conn):
         if not self.current_selected_data:
             QMessageBox.warning(self, "Błąd", "Proszę wybrać wizytę z listy.")
             return
@@ -150,9 +158,7 @@ class MainWindow(QWidget):
         ]
 
         for i, (data, tytul, lekarz) in enumerate(all_visits_data):
-
             list_item = QListWidgetItem()
-
             list_item.setData(Qt.ItemDataRole.UserRole, (data, tytul, lekarz))
 
             frame = QFrame()
@@ -167,9 +173,7 @@ class MainWindow(QWidget):
             for j, text in enumerate(labels_data):
                 label = QLabel(text.upper())
                 label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-                label.setStyleSheet(
-                    f"background-color: transparent; color: #444444; font-size: 14px; font-weight: bold;")
+                label.setStyleSheet(f"background-color: transparent; color: #444444; font-size: 14px; font-weight: bold;")
 
                 h_layout.addWidget(label, stretch=1 if j == 1 else 0)
 
