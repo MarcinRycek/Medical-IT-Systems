@@ -1,6 +1,7 @@
+import psycopg2
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QListWidget, QSizePolicy, \
     QListWidgetItem, QDialog, QMessageBox, QLineEdit
-from PySide6.QtCore import Qt, QSize, Signal, Slot
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
 class VisitDetailsWindow(QDialog):
@@ -30,8 +31,7 @@ class AddVisitWindow(QDialog):
         layout.addWidget(QLabel(f"<h2>Dodaj Nową Wizytę</h2>", self))
         layout.addWidget(QLabel(f"<b>Wprowadź dane wizyty:</b>", self))
 
-        # Add your input fields here for a new visit
-        # For example:
+
         self.date_input = QLineEdit(self)
         self.title_input = QLineEdit(self)
         self.doctor_input = QLineEdit(self)
@@ -52,10 +52,9 @@ class AddVisitWindow(QDialog):
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
     def _add_visit(self):
-        # Show a message box when the "Dodaj Wizytę" button is clicked
         QMessageBox.information(self, "Dodaj Wizytę", "Wizytę została dodana (placeholder).")
 
-        self.accept()  # Close the window after showing the message box
+        self.accept()
 
 
 class LogoutWindow(QDialog):
@@ -76,21 +75,18 @@ class LogoutWindow(QDialog):
         cancel_button.clicked.connect(self.reject)
         layout.addWidget(cancel_button, alignment=Qt.AlignmentFlag.AlignRight)
 
-        self.on_logged_out = on_logged_out  # Callback function to handle logout event
+        self.on_logged_out = on_logged_out
 
     def _logout(self):
-        # Show a message box when the "Wyloguj" button is clicked in the confirmation window
         QMessageBox.information(self, "Wylogowanie", "Zostałeś wylogowany.")
 
-        # Close the LogoutWindow and MainWindow after message box is closed
-        self.accept()  # Close the LogoutWindow
+        self.accept()
 
-        # Close the MainWindow (if it exists) and show the LoginWindow
         if self.on_logged_out:
-            self.on_logged_out()  # Call the callback to handle the logout in the main window
+            self.on_logged_out()
 
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, logged_in_user_id):
         super().__init__()
         self.setWindowTitle("MedEX-POL")
         self.setGeometry(100, 100, 1200, 700)
@@ -98,6 +94,10 @@ class MainWindow(QWidget):
 
         self.current_selected_frame = None
         self.current_selected_data = None
+
+        self.logged_in_user_id = logged_in_user_id
+
+        self.connection = self.connect_to_database()
 
         main_h_layout = QHBoxLayout(self)
         main_h_layout.setContentsMargins(0, 0, 0, 0)
@@ -159,12 +159,10 @@ class MainWindow(QWidget):
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
     def _show_add_visit_window(self):
-        # Open the "Dodaj Nową Wizytę" window
         add_visit_window = AddVisitWindow(self)
         add_visit_window.exec()
 
     def _show_logout_window(self):
-        # Open the "Wylogowanie" confirmation window
         logout_window = LogoutWindow(self, self._handle_logged_out)
         logout_window.exec()
 
@@ -181,7 +179,12 @@ class MainWindow(QWidget):
 
         data, tytul, lekarz = self.current_selected_data
 
-        details_window = VisitDetailsWindow(data, tytul, lekarz, self)
+        details_window = VisitDetailsWindow(
+            data_wizyty=data,
+            tytul_wizyty=tytul,
+            lekarz=lekarz,
+            parent=self
+        )
         details_window.exec()
 
     def set_palette(self):
@@ -224,36 +227,65 @@ class MainWindow(QWidget):
 
         header_frame.setLayout(header_layout)
         return header_frame
+    def connect_to_database(self):
+        conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
+
+        try:
+            connection = psycopg2.connect(conn_str)
+            print("Successfully connected to the database!")
+            return connection
+        except Exception as e:
+            print(f"Error connecting to the database: {e}")
+            return None
+
+    def fetch_visits_from_database(self):
+        if not self.connection:
+            return []
+
+        query = """
+        SELECT visit_date, title, coalesce(doctor_id, laborant_id)
+        FROM visits
+        WHERE pesel = %s
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, (self.logged_in_user_id,))
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+            return []
 
     def add_list_items(self):
         styles = ["background-color: #D3D3D3;", "background-color: #C4C4C4;"]
 
-        all_visits_data = [
-            ("2025-11-15", "Kontrolna Morfologia", "Dr. Jan Kowalski"),
-            ("2025-11-10", "Badanie EKG", "Laborant Anna Nowak"),
-            ("2025-10-28", "Konsultacja kardiologiczna", "Prof. Tomasz Lewicki"),
-            ("2025-10-01", "Pobranie Krwi - Lipidogram", "Laborant Ewa Górska"),
-            ("2025-09-12", "Wizyta u specjalisty", "Dr. Jan Kowalski"),
-        ]
+        all_visits_data = self.fetch_visits_from_database()
 
         for i, (data, tytul, lekarz) in enumerate(all_visits_data):
+
+            data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
+
             list_item = QListWidgetItem()
-            list_item.setData(Qt.ItemDataRole.UserRole, (data, tytul, lekarz))
+            list_item.setData(
+                Qt.ItemDataRole.UserRole,
+                (data_str, tytul, lekarz)
+            )
 
             frame = QFrame()
-            frame.setObjectName(f"visit_frame_{i}")
             frame.setFixedHeight(70)
             frame.setStyleSheet(styles[i % 2])
 
             h_layout = QHBoxLayout(frame)
             h_layout.setContentsMargins(10, 0, 10, 0)
 
-            labels_data = [data, tytul, lekarz]
-            for j, text in enumerate(labels_data):
-                label = QLabel(text.upper())
-                label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-                label.setStyleSheet(f"background-color: transparent; color: #444444; font-size: 14px; font-weight: bold;")
+            labels_data = [data_str, tytul, lekarz]
 
+            for j, text in enumerate(labels_data):
+                label = QLabel(str(text))  # ← ZERO upper()
+                label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+                label.setStyleSheet(
+                    "background-color: transparent; color: #444444; "
+                    "font-size: 14px; font-weight: bold;"
+                )
                 h_layout.addWidget(label, stretch=1 if j == 1 else 0)
 
             self.lista_wizyt.addItem(list_item)

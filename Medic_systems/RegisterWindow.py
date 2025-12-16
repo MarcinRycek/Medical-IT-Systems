@@ -103,23 +103,23 @@ class RegisterWindow(QWidget):
                 cursor.close()
                 conn.close()
 
-    def login_user(self, login, password):
+    def login_user(self):
         try:
-            conn = psycopg2.connect(conn_str)
-            cursor = conn.cursor()
+            self.conn = psycopg2.connect(conn_str)
+            cursor = self.conn.cursor()
 
-            cursor.execute("SELECT password, role FROM users WHERE login = %s", (login,))
+            cursor.execute("SELECT id, password, role FROM users WHERE login = %s", (self.login_box.text(),))
             result = cursor.fetchone()
 
             if result is None:
                 self.show_error_popup("Nie znaleziono takiego użytkownika.")
                 return
 
-            password_hash, role = result
+            user_id, password_hash, role = result
 
-            if bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8")):
-                self.show_success_popup(f"Dzień dobry, {login}!")
-                self.open_main_window()
+            if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
+                self.show_success_popup()
+                self.open_main_window(user_id)
             else:
                 self.show_error_popup("Niepoprawne hasło.")
 
@@ -129,7 +129,7 @@ class RegisterWindow(QWidget):
         finally:
             if 'conn' in locals():
                 cursor.close()
-                conn.close()
+                self.conn.close()
 
     def show_success_popup(self, message):
         QMessageBox.information(self, "Sukces", message, QMessageBox.Ok)
@@ -137,10 +137,10 @@ class RegisterWindow(QWidget):
     def show_error_popup(self, message):
         QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
 
-    def open_main_window(self):
+    def open_main_window(self, user_id):
         from MainWindow import MainWindow
         self.close()
-        self.main_window = MainWindow()
+        self.main_window = MainWindow(user_id)
         self.main_window.show()
 
 

@@ -1,6 +1,6 @@
 import psycopg2
 import bcrypt
-from PySide6.QtWidgets import QApplication, QWidget, QLineEdit, QPushButton, QVBoxLayout, QListWidget, QMessageBox
+from PySide6.QtWidgets import QWidget, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
 from PySide6.QtGui import QColor, QPalette, qRgb
 
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
@@ -61,18 +61,18 @@ class LoginWindow(QWidget):
             self.conn = psycopg2.connect(conn_str)
             cursor = self.conn.cursor()
 
-            cursor.execute("SELECT password, role FROM users WHERE login = %s", (self.login_box.text(),))
+            cursor.execute("SELECT id, password, role FROM users WHERE login = %s", (self.login_box.text(),))
             result = cursor.fetchone()
 
             if result is None:
                 self.show_error_popup("Nie znaleziono takiego użytkownika.")
                 return
 
-            password_hash, role = result
+            user_id, password_hash, role = result
 
             if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
                 self.show_success_popup()
-                self.open_main_window()
+                self.open_main_window(user_id)
             else:
                 self.show_error_popup("Niepoprawne hasło.")
 
@@ -90,8 +90,8 @@ class LoginWindow(QWidget):
     def show_error_popup(self, message):
         QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
 
-    def open_main_window(self):
+    def open_main_window(self,user_id):
         from MainWindow import MainWindow
         self.close()
-        self.main_window = MainWindow()
+        self.main_window = MainWindow(user_id)
         self.main_window.show()
