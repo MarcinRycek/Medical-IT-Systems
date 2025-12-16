@@ -1,7 +1,5 @@
-import psycopg2
 from PySide6.QtWidgets import QApplication
 import sys
-from LoginWindow import LoginWindow
 from LoginWindow import LoginWindow
 
 if __name__ == "__main__":

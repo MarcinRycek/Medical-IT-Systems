@@ -110,7 +110,40 @@ class MainWindow(QWidget):
         side_layout.setSpacing(40)
         side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         side_layout.setContentsMargins(20, 150, 20, 20)
+        # ===== KOD PACJENTA =====
+        patient_code = self.fetch_patient_code()
+        code_text = str(patient_code) if patient_code else "------"
 
+        code_frame = QFrame(self)
+        code_frame.setFixedSize(250, 80)
+        code_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 15px;
+                border: 2px solid #CCCCCC;
+            }
+        """)
+
+        code_layout = QVBoxLayout(code_frame)
+        code_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        code_label_title = QLabel("KOD PACJENTA", code_frame)
+        code_label_title.setStyleSheet("color: #666666; font-size: 12px;")
+
+        code_label = QLabel(code_text, code_frame)
+        code_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #000000;
+        """)
+
+        code_layout.addWidget(code_label_title)
+        code_layout.addWidget(code_label)
+
+        side_layout.addWidget(code_frame, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # ===== PRZYCISK =====
         zobacz_wizyte_btn = self.add_button(side_layout, "zobacz wizytę")
         dodaj_wizyte_btn = self.add_button(side_layout, "dodaj nową wizytę")
         wyloguj_btn = self.add_button(side_layout, "wyloguj")
@@ -145,6 +178,24 @@ class MainWindow(QWidget):
         main_h_layout.addWidget(main_content_frame)
         self.setLayout(main_h_layout)
 
+    def fetch_patient_code(self):
+        if not self.connection:
+            return None
+
+        query = """
+        SELECT code
+        FROM patient_codes
+        WHERE pesel = %s
+        LIMIT 1
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, (self.logged_in_user_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            print(f"Error fetching patient code: {e}")
+            return None
     def _handle_item_clicked(self, item):
         if self.current_selected_frame:
             idx = self.lista_wizyt.row(self.lista_wizyt.itemAt(self.current_selected_frame.pos()))
