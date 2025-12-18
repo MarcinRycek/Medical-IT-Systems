@@ -70,9 +70,11 @@ class LoginWindow(QWidget):
 
             user_id, password_hash, role = result
 
+            print(role)
+
             if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
                 self.show_success_popup()
-                self.open_main_window(user_id)
+                self.open_main_window(user_id, role)
             else:
                 self.show_error_popup("Niepoprawne hasło.")
 
@@ -90,8 +92,8 @@ class LoginWindow(QWidget):
     def show_error_popup(self, message):
         QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
 
-    def open_main_window(self,user_id):
+    def open_main_window(self,user_id, role):
         from MainWindow import MainWindow
         self.close()
-        self.main_window = MainWindow(user_id)
+        self.main_window = MainWindow(user_id, role)
         self.main_window.show()

@@ -86,7 +86,7 @@ class LogoutWindow(QDialog):
             self.on_logged_out()
 
 class MainWindow(QWidget):
-    def __init__(self, logged_in_user_id):
+    def __init__(self, logged_in_user_id, role):
         super().__init__()
         self.setWindowTitle("MedEX-POL")
         self.setGeometry(100, 100, 1200, 700)
@@ -96,6 +96,7 @@ class MainWindow(QWidget):
         self.current_selected_data = None
 
         self.logged_in_user_id = logged_in_user_id
+        self.role = role
 
         self.connection = self.connect_to_database()
 
