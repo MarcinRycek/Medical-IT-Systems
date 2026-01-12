@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO WPISYWANIA WYNIKÓW (NOWE) ---
+# --- OKNO WPISYWANIA WYNIKÓW ---
 class FillLabResultWindow(QDialog):
     def __init__(self, test_id, test_title, parent=None):
         super().__init__(parent)
@@ -15,20 +15,48 @@ class FillLabResultWindow(QDialog):
         self.setWindowTitle(f"Wynik badania: {test_title}")
         self.resize(500, 400)
 
+        # Stylizacja okna
+        self.setStyleSheet("background-color: #F0F2F5;")
+
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
 
         layout.addWidget(QLabel(f"<h2>Uzupełnij wynik</h2>"))
-        layout.addWidget(QLabel(f"<b>Badanie:</b> {test_title}"))
+
+        info_lbl = QLabel(f"<b>Badanie:</b> {test_title}")
+        info_lbl.setStyleSheet("font-size: 14px; color: #333;")
+        layout.addWidget(info_lbl)
 
         layout.addWidget(QLabel("Opis wyników / Parametry:"))
+
         self.result_edit = QTextEdit()
         self.result_edit.setPlaceholderText("Wpisz tutaj szczegółowe wyniki badania...")
+        self.result_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: white; 
+                border: 1px solid #CCC; 
+                border-radius: 5px; 
+                padding: 10px;
+                font-size: 13px;
+                color: black;
+            }
+        """)
         layout.addWidget(self.result_edit)
 
         btn = QPushButton("ZAPISZ WYNIK")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFixedHeight(50)
-        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px;")
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2F9ADF; 
+                color: white; 
+                font-weight: bold; 
+                border-radius: 5px; 
+                font-size: 14px;
+            }
+            QPushButton:hover { background-color: #1F8ACF; }
+        """)
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
@@ -61,12 +89,20 @@ class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Laborant")
         self.code_input = None
+        # Ta metoda z BaseWindow wywoła setup_sidebar_widgets
         self.init_ui()
 
+    # Ta metoda jest WYMAGANA przez BaseWindow
     def setup_sidebar_widgets(self):
-        self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
+        # Info o laborancie (metoda z BaseWindow)
+        # Upewnij się, że masz najnowsze BaseWindow, jeśli tu wystąpi błąd
+        try:
+            self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
+        except AttributeError:
+            # Fallback jeśli masz starszą wersję BaseWindow
+            pass
 
-        # --- SEKCJA WYSZUKIWANIA KODEM (Identyczna jak u Lekarza) ---
+        # --- SEKCJA WYSZUKIWANIA KODEM ---
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
         search_frame.setStyleSheet("""
@@ -100,13 +136,13 @@ class LaborantWindow(BaseWindow):
 
         self.side_layout.addWidget(search_frame)
 
+    # Ta metoda jest WYMAGANA przez BaseWindow
     def setup_extra_buttons(self):
         # Przycisk do wpisywania wyników
         self.add_button("WPISZ WYNIKI").clicked.connect(self.open_fill_result)
 
     def get_sql_query(self):
-        # Domyślnie lista jest pusta lub pokazuje zlecenia przypisane bezpośrednio do laboranta (jeśli byśmy to wdrażali).
-        # Tutaj zostawiamy puste, wymuszając użycie kodu.
+        # Domyślnie pusta lista (wymagamy kodu)
         return ""
 
     def load_patient_by_code(self):
@@ -165,9 +201,10 @@ class LaborantWindow(BaseWindow):
             QMessageBox.critical(self, "Błąd", "Nie można zidentyfikować badania.")
             return
 
-        # Otwieramy okno edycji
+        # Otwieramy okno edycji i po zamknięciu (jeśli sukces) nic nie robimy lub odświeżamy
         if FillLabResultWindow(test_id, test_title, self).exec():
-            # Po zapisaniu odświeżamy listę (opcjonalnie, aby np. pokazać że zrobione)
+            # Można odświeżyć listę, ale wymagałoby to ponownego wpisania kodu,
+            # więc na razie zostawiamy widok jak jest
             pass
 
     # --- NADPISANIE FUNKCJI LISTY (ABY OBSŁUŻYĆ ID BADANIA) ---
@@ -185,7 +222,8 @@ class LaborantWindow(BaseWindow):
 
             frame = QFrame()
             frame.setFixedHeight(60)
-            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD;")
+            # Styl z czarnym tekstem
+            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD; color: black;")
 
             # --- ZAPAMIĘTUJEMY ID BADANIA ---
             frame.setProperty("test_id", tid)
@@ -204,7 +242,7 @@ class LaborantWindow(BaseWindow):
                 if j == 1:
                     lbl.setStyleSheet("border: none; color: #2F9ADF; font-weight: bold; font-size: 13px;")
                 else:
-                    lbl.setStyleSheet("border: none; color: #333; font-size: 12px;")
+                    lbl.setStyleSheet("border: none; color: black; font-size: 12px;")
 
                 hl.addWidget(lbl, stretch=1 if j == 1 else 0)
                 if j < 2: hl.addSpacing(20)

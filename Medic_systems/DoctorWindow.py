@@ -1,28 +1,30 @@
 import psycopg2
 from datetime import datetime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QMessageBox, QFrame)
+                               QPushButton, QMessageBox, QFrame,
+                               QListWidgetItem, QHBoxLayout)
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import QListWidgetItem, QHBoxLayout  # Potrzebne do nadpisania add_list_items
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO ZLECANIA BADANIA (NOWE) ---
+# --- OKNO ZLECANIA BADANIA ---
 class AddLabTestWindow(QDialog):
     def __init__(self, visit_id, parent=None):
         super().__init__(parent)
         self.visit_id = visit_id
         self.setWindowTitle("Zleć Badanie")
         self.resize(400, 250)
+        self.setStyleSheet("background-color: #F0F0F0;")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
 
-        layout.addWidget(QLabel("<h2>Nowe Zlecenie Laboratoryjne</h2>"))
+        layout.addWidget(QLabel("<h2>Nowe Zlecenie</h2>"))
         layout.addWidget(QLabel("Nazwa badania (np. Morfologia, RTG):"))
 
         self.title_in = QLineEdit()
         self.title_in.setPlaceholderText("Wpisz nazwę badania...")
+        self.title_in.setStyleSheet("background-color: white; border: 1px solid #AAA; padding: 5px;")
         layout.addWidget(self.title_in)
 
         info_lbl = QLabel("Opis/Wyniki zostaną uzupełnione przez Laboranta.")
@@ -33,7 +35,8 @@ class AddLabTestWindow(QDialog):
 
         btn = QPushButton("ZLEĆ BADANIE")
         btn.setFixedHeight(45)
-        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px;")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border: 1px solid #1F8ACF;")
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
@@ -47,7 +50,6 @@ class AddLabTestWindow(QDialog):
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
-            # Wstawiamy tylko tytuł i ID wizyty. Opis (description) zostawiamy pusty (NULL) dla laboranta.
             cursor.execute("INSERT INTO lab_tests (visit_id, title) VALUES (%s, %s)",
                            (self.visit_id, title))
             conn.commit()
@@ -59,13 +61,14 @@ class AddLabTestWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- OKNO DODAWANIA WIZYTY (Bez zmian) ---
+# --- OKNO DODAWANIA WIZYTY ---
 class AddVisitWindow(QDialog):
     def __init__(self, doctor_id, parent=None):
         super().__init__(parent)
         self.doctor_id = doctor_id
         self.setWindowTitle("Dodaj Nową Wizytę")
         self.resize(400, 400)
+        self.setStyleSheet("background-color: #F0F0F0;")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -82,6 +85,11 @@ class AddVisitWindow(QDialog):
         self.pesel_in = QLineEdit()
         self.pesel_in.setPlaceholderText("PESEL Pacjenta")
 
+        style_input = "background-color: white; border: 1px solid #AAA; padding: 5px;"
+        self.date_in.setStyleSheet(style_input)
+        self.title_in.setStyleSheet(style_input)
+        self.pesel_in.setStyleSheet(style_input)
+
         for lbl, widget in [("Data:", self.date_in), ("Tytuł:", self.title_in), ("Pacjent (PESEL):", self.pesel_in)]:
             layout.addWidget(QLabel(lbl))
             layout.addWidget(widget)
@@ -90,7 +98,8 @@ class AddVisitWindow(QDialog):
 
         btn = QPushButton("ZATWIERDŹ")
         btn.setFixedHeight(50)
-        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px;")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border: 1px solid #1F8ACF;")
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
@@ -131,15 +140,18 @@ class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Lekarz")
         self.code_input = None
-        self.init_ui()
+        self.init_ui()  # To wywołuje setup_sidebar_widgets
 
+    # Ta metoda musi istnieć, aby BaseWindow nie zgłaszał błędu
     def setup_sidebar_widgets(self):
+        # Info o lekarzu
         self.setup_info_widget("PANEL LEKARZA", f"ID: {self.user_id}")
 
+        # Widget wyszukiwania (prostszy styl)
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
         search_frame.setStyleSheet("""
-            QFrame { background-color: white; border-radius: 10px; border: 2px solid #CCC; }
+            QFrame { background-color: white; border: 2px solid #CCC; }
         """)
 
         layout = QVBoxLayout(search_frame)
@@ -153,12 +165,12 @@ class DoctorWindow(BaseWindow):
         self.code_input = QLineEdit(search_frame)
         self.code_input.setPlaceholderText("Kod (6 cyfr)")
         self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_input.setStyleSheet("border: 1px solid #AAA; border-radius: 5px; padding: 5px; color: black;")
+        self.code_input.setStyleSheet("border: 1px solid #AAA; padding: 5px; color: black;")
 
         search_btn = QPushButton("POBIERZ HISTORIĘ", search_frame)
         search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         search_btn.setStyleSheet("""
-            QPushButton { background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px; padding: 5px; border: none;}
+            QPushButton { background-color: #2F9ADF; color: white; font-weight: bold; padding: 5px; border: none;}
             QPushButton:hover { background-color: #1F8ACF; }
         """)
         search_btn.clicked.connect(self.load_patient_by_code)
@@ -172,7 +184,6 @@ class DoctorWindow(BaseWindow):
     def setup_extra_buttons(self):
         self.add_button("MÓJ HARMONOGRAM").clicked.connect(self.reset_to_my_schedule)
         self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
-        # NOWY PRZYCISK
         self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 
     def open_add_visit(self):
@@ -180,12 +191,10 @@ class DoctorWindow(BaseWindow):
             self.refresh_list()
 
     def open_add_lab_test(self):
-        # Sprawdzamy czy coś jest zaznaczone
         if not self.current_selected_frame:
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy, do której chcesz zlecić badanie.")
             return
 
-        # Pobieramy ukryte ID wizyty z właściwości widgetu
         visit_id = self.current_selected_frame.property("visit_id")
 
         if not visit_id:
@@ -199,7 +208,7 @@ class DoctorWindow(BaseWindow):
         self.refresh_list()
 
     def get_sql_query(self):
-        # Zmienione zapytanie - pobieramy też ID wizyty (pierwsza kolumna)
+        # Pobieramy ID wizyty
         return "SELECT id, visit_date, title, pesel FROM visits WHERE doctor_id = %s"
 
     def load_patient_by_code(self):
@@ -220,7 +229,6 @@ class DoctorWindow(BaseWindow):
                     return
 
                 pesel = res[0]
-                # Tu też pobieramy ID wizyty
                 cursor.execute(
                     "SELECT id, visit_date, title, doctor_id FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
                     (pesel,))
@@ -233,24 +241,22 @@ class DoctorWindow(BaseWindow):
         except Exception as e:
             QMessageBox.critical(self, "Błąd", str(e))
 
-    # --- NADPISANIE FUNKCJI Z BaseWindow ABY OBSŁUŻYĆ ID WIZYTY ---
+    # --- NADPISANIE FUNKCJI LISTY (ABY OBSŁUŻYĆ ID WIZYTY) ---
     def add_list_items(self, data_rows):
-        styles = ["background-color: #FFFFFF;", "background-color: #F0F0F0;"]
+        styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 
-        # data_rows zawiera teraz 4 elementy: (id, data, tytul, osoba)
         for i, (vid, data, tytul, osoba) in enumerate(data_rows):
             data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
             osoba_str = str(osoba)
 
             list_item = QListWidgetItem()
-            # UserRole przechowuje dane do wyświetlania szczegółów (kompatybilność z BaseWindow)
             list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, osoba_str))
 
             frame = QFrame()
             frame.setFixedHeight(60)
-            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD;")
+            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #AAA; color: black;")
 
-            # --- KLUCZOWE: Zapamiętujemy ID wizyty w ramce ---
+            # Zapamiętujemy ID wizyty
             frame.setProperty("visit_id", vid)
 
             hl = QHBoxLayout(frame)
@@ -260,9 +266,8 @@ class DoctorWindow(BaseWindow):
             for j, txt in enumerate(labels):
                 lbl = QLabel(txt)
                 lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-                lbl.setStyleSheet("border: none; color: #333; font-size: 13px;")
+                lbl.setStyleSheet("border: none; color: black; font-size: 13px;")
                 hl.addWidget(lbl, stretch=1 if j == 1 else 0)
-                if j < 2: hl.addSpacing(20)
 
             self.lista_wizyt.addItem(list_item)
             list_item.setSizeHint(QSize(0, 60))
