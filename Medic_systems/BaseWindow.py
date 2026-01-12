@@ -1,7 +1,7 @@
 import psycopg2
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
                                QPushButton, QListWidget, QListWidgetItem,
-                               QDialog, QMessageBox, QLineEdit)
+                               QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
@@ -12,8 +12,8 @@ conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Szczegóły Wizyty: {tytul_wizyty}")
-        self.setGeometry(300, 300, 600, 400)
+        self.setWindowTitle(f"Szczegóły Wizyty")
+        self.resize(500, 300)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"<h2>Szczegóły Wizyty</h2>", self))
         layout.addWidget(QLabel(f"<b>Data:</b> {data_wizyty}", self))
@@ -28,26 +28,29 @@ class LogoutWindow(QDialog):
     def __init__(self, parent=None, on_logged_out=None):
         super().__init__(parent)
         self.setWindowTitle("Wylogowanie")
-        self.setGeometry(300, 300, 600, 400)
+        self.resize(400, 200)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("<h2>Potwierdzenie Wylogowania</h2>", self))
+        layout.addWidget(QLabel("<h2>Potwierdzenie</h2>", self))
         layout.addWidget(QLabel("<b>Czy na pewno chcesz się wylogować?</b>", self))
+
+        btn_layout = QHBoxLayout()
         logout_button = QPushButton("Wyloguj", self)
         logout_button.clicked.connect(self._logout)
-        layout.addWidget(logout_button, alignment=Qt.AlignmentFlag.AlignRight)
         cancel_button = QPushButton("Anuluj", self)
         cancel_button.clicked.connect(self.reject)
-        layout.addWidget(cancel_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        btn_layout.addWidget(cancel_button)
+        btn_layout.addWidget(logout_button)
+        layout.addLayout(btn_layout)
         self.on_logged_out = on_logged_out
 
     def _logout(self):
-        QMessageBox.information(self, "Wylogowanie", "Zostałeś wylogowany.")
         self.accept()
         if self.on_logged_out:
             self.on_logged_out()
 
 
-# --- KLASA BAZOWA DLA GŁÓWNYCH OKIEN ---
+# --- KLASA BAZOWA ---
 class BaseWindow(QWidget):
     def __init__(self, user_id, role_title):
         super().__init__()
@@ -55,74 +58,91 @@ class BaseWindow(QWidget):
         self.role_title = role_title
 
         self.setWindowTitle(f"MedEX-POL - Panel: {self.role_title}")
-        self.setGeometry(100, 100, 1200, 700)
+        self.resize(1200, 800)  # Startowy rozmiar okna
         self.set_palette()
 
         self.current_selected_frame = None
         self.current_selected_data = None
         self.connection = self.connect_to_database()
 
-        # Layout Główny
+        # Główny Layout Horyzontalny
         self.main_h_layout = QHBoxLayout(self)
         self.main_h_layout.setContentsMargins(0, 0, 0, 0)
         self.main_h_layout.setSpacing(0)
 
-        # Panel boczny (Base setup)
+        # --- PANEL BOCZNY (Fixed Width) ---
         self.side_panel = QFrame(self)
         self.side_panel.setFixedWidth(300)
-        self.side_panel.setStyleSheet("background-color: rgb(172, 248, 122);")
-        self.side_layout = QVBoxLayout(self.side_panel)
-        self.side_layout.setSpacing(40)
-        self.side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.side_layout.setContentsMargins(20, 150, 20, 20)
+        self.side_panel.setStyleSheet("background-color: rgb(172, 248, 122); border-right: 1px solid #999;")
 
-        # Treść główna (Prawa strona)
+        # Layout Panelu Bocznego
+        self.side_layout = QVBoxLayout(self.side_panel)
+        self.side_layout.setSpacing(15)  # Zmniejszone odstępy, żeby przyciski nie nachodziły
+        self.side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # Marginesy: Lewy, Góra, Prawy, Dół. Góra zmniejszona z 150 na 50.
+        self.side_layout.setContentsMargins(20, 50, 20, 20)
+
+        # --- GŁÓWNA TREŚĆ (Reszta ekranu) ---
         self.main_content_frame = QFrame(self)
-        self.main_content_frame.setStyleSheet("background-color: rgb(172, 248, 122);")
+        self.main_content_frame.setStyleSheet("background-color: rgb(240, 255, 230);")
         self.main_v_layout = QVBoxLayout(self.main_content_frame)
         self.main_v_layout.setContentsMargins(0, 0, 0, 0)
         self.main_v_layout.setSpacing(0)
 
-        # Lista wizyt
         self.lista_wizyt = QListWidget(self.main_content_frame)
         self.lista_wizyt.setFrameShape(QFrame.Shape.NoFrame)
         self.lista_wizyt.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.lista_wizyt.setMinimumSize(QSize(100, 100))
         self.lista_wizyt.itemClicked.connect(self._handle_item_clicked)
 
     def init_ui(self):
-        """Ta metoda musi być wywołana w __init__ klas pochodnych"""
-        self.setup_sidebar_widgets()  # Do nadpisania w klasach pochodnych
+        """Buduje interfejs. Wywoływane w __init__ dzieci."""
+        # 1. Widgety specyficzne (np. Kod Pacjenta)
+        self.setup_sidebar_widgets()
 
-        # Przyciski wspólne
-        zobacz_wizyte_btn = self.add_button("zobacz szczegóły")
-        zobacz_wizyte_btn.clicked.connect(self._show_visit_details)
+        # 2. Separator/Odstęp
+        self.side_layout.addSpacing(20)
 
-        self.setup_extra_buttons()  # Miejsce na przyciski specyficzne (np. Dodaj Wizytę)
+        # 3. Przyciski wspólne
+        zobacz_btn = self.add_button("ZOBACZ SZCZEGÓŁY")
+        zobacz_btn.clicked.connect(self._show_visit_details)
 
-        wyloguj_btn = self.add_button("wyloguj")
-        wyloguj_btn.clicked.connect(self._show_logout_window)
+        # 4. Przyciski specyficzne (np. Dodaj wizytę)
+        self.setup_extra_buttons()
+
+        # 5. Rozpychacz - przesuwa przycisk wylogowania na sam dół
         self.side_layout.addStretch(1)
 
-        # Nagłówek i lista
-        third_col_name = "DOKTOR:" if self.role_title == "Pacjent" else "PACJENT (PESEL):"
-        header_frame = self.create_header_bar(self.main_content_frame, third_col_name)
-        self.main_v_layout.addWidget(header_frame)
+        # 6. Przycisk wylogowania (na dole)
+        wyloguj_btn = self.add_button("WYLOGUJ")
+        wyloguj_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #444444; color: #FFDDDD; 
+                font-size: 14px; border-radius: 8px; padding: 15px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #662222; }
+        """)
+        wyloguj_btn.clicked.connect(self._show_logout_window)
+
+        # Prawa strona (Nagłówek + Lista)
+        third_col = "DOKTOR:" if self.role_title == "Pacjent" else "PACJENT (PESEL):"
+        header = self.create_header_bar(self.main_content_frame, third_col)
+        self.main_v_layout.addWidget(header)
         self.main_v_layout.addWidget(self.lista_wizyt)
 
         self.main_h_layout.addWidget(self.side_panel)
         self.main_h_layout.addWidget(self.main_content_frame)
         self.setLayout(self.main_h_layout)
+
         self.refresh_list()
 
     def setup_sidebar_widgets(self):
-        pass  # Placeholder
+        pass
 
     def setup_extra_buttons(self):
-        pass  # Placeholder
+        pass
 
     def get_sql_query(self):
-        return ""  # Placeholder
+        return ""
 
     def refresh_list(self):
         self.lista_wizyt.clear()
@@ -135,10 +155,10 @@ class BaseWindow(QWidget):
                 rows = cursor.fetchall()
                 self.add_list_items(rows)
         except Exception as e:
-            print(f"Błąd pobierania danych: {e}")
+            print(f"SQL Error: {e}")
 
     def add_list_items(self, data_rows):
-        styles = ["background-color: #D3D3D3;", "background-color: #C4C4C4;"]
+        styles = ["background-color: #FFFFFF;", "background-color: #F0F0F0;"]
         for i, (data, tytul, osoba) in enumerate(data_rows):
             data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
             osoba_str = str(osoba)
@@ -147,38 +167,40 @@ class BaseWindow(QWidget):
             list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, osoba_str))
 
             frame = QFrame()
-            frame.setFixedHeight(70)
-            frame.setStyleSheet(styles[i % 2])
-            h_layout = QHBoxLayout(frame)
-            h_layout.setContentsMargins(10, 0, 10, 0)
+            frame.setFixedHeight(60)  # Mniejsza wysokość wiersza dla lepszej czytelności
+            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD;")
+
+            hl = QHBoxLayout(frame)
+            hl.setContentsMargins(10, 0, 10, 0)
 
             labels = [data_str, tytul, osoba_str]
-            for j, text in enumerate(labels):
-                label = QLabel(text)
-                label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-                label.setStyleSheet(
-                    "background-color: transparent; color: #444444; font-size: 14px; font-weight: bold;")
-                h_layout.addWidget(label, stretch=1 if j == 1 else 0)
+            for j, txt in enumerate(labels):
+                lbl = QLabel(txt)
+                lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+                lbl.setStyleSheet("border: none; color: #333; font-size: 13px;")
+                hl.addWidget(lbl, stretch=1 if j == 1 else 0)
+                if j < 2: hl.addSpacing(20)
 
             self.lista_wizyt.addItem(list_item)
-            list_item.setSizeHint(QSize(0, frame.height()))
+            list_item.setSizeHint(QSize(0, 60))
             self.lista_wizyt.setItemWidget(list_item, frame)
 
     def _handle_item_clicked(self, item):
+        # Reset stylu poprzedniego
         if self.current_selected_frame:
-            idx = self.lista_wizyt.row(self.lista_wizyt.itemAt(self.current_selected_frame.pos()))
-            original_style = "background-color: #D3D3D3;" if idx % 2 == 0 else "background-color: #C4C4C4;"
-            self.current_selected_frame.setStyleSheet(original_style)
+            # Prosty reset stylu nie jest idealny przy naprzemiennych kolorach,
+            # ale dla uproszczenia przywracamy biały/szary w nast. odświeżeniu lub ignorujemy
+            self.current_selected_frame.setStyleSheet("background-color: #EEE;")
 
         selected_frame = self.lista_wizyt.itemWidget(item)
         if selected_frame:
-            selected_frame.setStyleSheet("background-color: #2F9ADF;")
+            selected_frame.setStyleSheet("background-color: #BDE4F7; border: 1px solid #2F9ADF;")
             self.current_selected_frame = selected_frame
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
     def _show_visit_details(self):
         if not self.current_selected_data:
-            QMessageBox.warning(self, "Błąd", "Wybierz wizytę z listy.")
+            QMessageBox.warning(self, "Uwaga", "Wybierz wizytę z listy.")
             return
         d, t, o = self.current_selected_data
         VisitDetailsWindow(d, t, o, self).exec()
@@ -194,24 +216,43 @@ class BaseWindow(QWidget):
 
     def add_button(self, text):
         button = QPushButton(text.upper(), self)
-        button.setFixedSize(QSize(250, 70))
+        # ZMIANA: Zamiast FixedSize używamy FixedHeight.
+        # Szerokość dostosuje się do panelu (minus marginesy layoutu).
+        button.setFixedHeight(60)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setStyleSheet("""
-            QPushButton { background-color: #555555; color: white; font-size: 16px; border-radius: 10px; border: none; }
-            QPushButton:hover { background-color: #666666; }
+            QPushButton {
+                background-color: #555555; 
+                color: white; 
+                font-size: 14px;
+                border: none;
+                border-radius: 8px; 
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #777777;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+            }
         """)
-        self.side_layout.addWidget(button, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.side_layout.addWidget(button)
         return button
 
-    def create_header_bar(self, parent, third_col_name):
+    def create_header_bar(self, parent, col3_text):
         f = QFrame(parent)
         f.setFixedHeight(40)
-        f.setStyleSheet("background-color: #808080;")
+        f.setStyleSheet("background-color: #666; border-bottom: 2px solid #444;")
         hl = QHBoxLayout(f)
         hl.setContentsMargins(10, 0, 10, 0)
-        for i, txt in enumerate(["DATA", "OPIS", third_col_name]):
+
+        headers = ["DATA", "OPIS", col3_text]
+        for i, txt in enumerate(headers):
             l = QLabel(txt)
-            l.setStyleSheet("color: white; font-weight: bold; font-size: 14px;")
+            l.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
             hl.addWidget(l, stretch=1 if i == 1 else 0)
+            if i < 2: hl.addSpacing(20)
         f.setLayout(hl)
         return f
 
@@ -224,21 +265,22 @@ class BaseWindow(QWidget):
         try:
             return psycopg2.connect(conn_str)
         except Exception as e:
-            print(e)
+            print(f"DB Error: {e}")
             return None
 
     def setup_info_widget(self, title, subtitle):
         frame = QFrame(self)
-        frame.setFixedSize(250, 80)
-        frame.setStyleSheet("background-color: #555555; border-radius: 15px;")
+        frame.setFixedHeight(80)  # Stała wysokość
+        frame.setStyleSheet("background-color: #4A4A4A; border-radius: 10px;")
         layout = QVBoxLayout(frame)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(2)
 
         l1 = QLabel(title, frame)
-        l1.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
+        l1.setStyleSheet("color: white; font-size: 16px; font-weight: bold; border: none;")
         l2 = QLabel(subtitle, frame)
-        l2.setStyleSheet("color: #DDDDDD; font-size: 12px;")
+        l2.setStyleSheet("color: #CCCCCC; font-size: 11px; border: none;")
 
         layout.addWidget(l1)
         layout.addWidget(l2)
-        self.side_layout.addWidget(frame, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.side_layout.addWidget(frame)

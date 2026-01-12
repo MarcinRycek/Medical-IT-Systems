@@ -1,67 +1,119 @@
 import psycopg2
 import bcrypt
-from PySide6.QtWidgets import QApplication, QWidget, QLineEdit, QPushButton, QVBoxLayout, QListWidget, QMessageBox
-from PySide6.QtGui import QColor, QPalette, qRgb
-import sys
+from PySide6.QtWidgets import (QWidget, QLineEdit, QPushButton, QVBoxLayout,
+                               QMessageBox, QLabel, QComboBox)
+from PySide6.QtCore import Qt
 
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
+
 
 class RegisterWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("MedEX-POL - Rejestracja")
+        self.resize(350, 500)
 
-        self.setWindowTitle("MedEX-POL Rejestracja")
-        self.set_palette()
+        # --- STYLESHEET ---
+        # Ten sam kolor tła (#ACF87A) i kontrastowe pola
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #ACF87A;
+                font-family: 'Segoe UI', sans-serif;
+                color: #000000;
+            }
 
-        self.pesel_box_register = QLineEdit('', self)
-        self.pesel_box_register.setPlaceholderText("Pesel")
-        self.login_box_register = QLineEdit('', self)
-        self.login_box_register.setPlaceholderText("Login")
-        self.password_box_register = QLineEdit('', self)
-        self.password_box_register.setPlaceholderText("Hasło")
-        self.password_box_register.setEchoMode(QLineEdit.Password)
+            /* Pola tekstowe i Lista rozwijana */
+            QLineEdit, QComboBox {
+                background-color: #FFFFFF;
+                color: #000000;  /* Czarny tekst */
+                border: 2px solid #555555;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: 14px;
+            }
+            QLineEdit:focus, QComboBox:focus {
+                border: 2px solid #0055AA;
+            }
 
-        self.role_box = QListWidget(self)
-        self.role_box.addItem("Pacjent")
-        self.role_box.addItem("Lekarz")
-        self.role_box.addItem("Laborant")
+            /* Naprawa widoku listy w QComboBox */
+            QComboBox QAbstractItemView {
+                background-color: #FFFFFF;
+                color: #000000;
+                selection-background-color: #2F9ADF;
+            }
 
-        Register_button_2 = QPushButton("Zarejestruj się", self)
-        Register_button_2.clicked.connect(self.register_user)
+            /* Przyciski */
+            QPushButton {
+                background-color: #FFFFFF;
+                color: #000000;
+                border: 2px solid #555555;
+                border-radius: 10px;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #E0E0E0;
+            }
 
-        Back_button = QPushButton("Wróć", self)
-        Back_button.clicked.connect(self.show_login)
+            /* Etykiety */
+            QLabel {
+                font-weight: bold;
+                font-size: 14px;
+                color: #222222;
+            }
+            QLabel#header {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+        """)
 
-        self.pesel_box_register.setFixedWidth(200)
-        self.login_box_register.setFixedWidth(200)
-        self.password_box_register.setFixedWidth(200)
-        Register_button_2.setFixedWidth(200)
-        Back_button.setFixedWidth(200)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(10)
+        layout.setContentsMargins(40, 20, 40, 20)
 
-        layout_register = QVBoxLayout(self)
+        header = QLabel("Utwórz konto", objectName="header")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
 
-        layout_register.addWidget(self.pesel_box_register)
-        layout_register.addWidget(self.login_box_register)
-        layout_register.addWidget(self.password_box_register)
-        layout_register.addWidget(self.role_box)
-        layout_register.addWidget(Register_button_2)
-        layout_register.addWidget(Back_button)
+        # Pola formularza
+        layout.addWidget(QLabel("PESEL (11 cyfr):"))
+        self.pesel_box = QLineEdit(self)
+        self.pesel_box.setPlaceholderText("Wpisz PESEL")
+        self.pesel_box.setMaxLength(11)
+        layout.addWidget(self.pesel_box)
 
-        layout_register.setStretch(0, 0)
-        layout_register.setStretch(1, 0)
-        layout_register.setStretch(2, 0)
-        layout_register.setStretch(3, 0)
-        layout_register.setStretch(4, 0)
-        layout_register.setStretch(5, 0)
+        layout.addWidget(QLabel("Login:"))
+        self.login_box = QLineEdit(self)
+        self.login_box.setPlaceholderText("Wpisz login")
+        layout.addWidget(self.login_box)
 
-        self.setLayout(layout_register)
+        layout.addWidget(QLabel("Hasło:"))
+        self.password_box = QLineEdit(self)
+        self.password_box.setPlaceholderText("Wpisz hasło")
+        self.password_box.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_box)
 
-        self.setFixedSize(220, 200)
+        layout.addWidget(QLabel("Rola:"))
+        self.role_combo = QComboBox(self)
+        self.role_combo.addItems(["Pacjent", "Lekarz", "Laborant"])
+        layout.addWidget(self.role_combo)
 
-    def set_palette(self):
-        palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(qRgb(172, 248, 122)))
-        self.setPalette(palette)
+        layout.addSpacing(20)
+
+        # Przyciski
+        reg_btn = QPushButton("ZAREJESTRUJ SIĘ")
+        reg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        reg_btn.clicked.connect(self.register_user)
+        layout.addWidget(reg_btn)
+
+        back_btn = QPushButton("Wróć")
+        back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        back_btn.clicked.connect(self.show_login)
+        layout.addWidget(back_btn)
+
+        layout.addStretch()
 
     def show_login(self):
         from LoginWindow import LoginWindow
@@ -70,18 +122,32 @@ class RegisterWindow(QWidget):
         self.login_window.show()
 
     def register_user(self):
-        pesel = self.pesel_box_register.text()
-        login = self.login_box_register.text()
-        password = self.password_box_register.text()
-        role = self.role_box.currentItem().text()
+        pesel = self.pesel_box.text().strip()
+        login = self.login_box.text().strip()
+        password = self.password_box.text().strip()
+        role = self.role_combo.currentText()
 
+        if not pesel or not login or not password:
+            QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola!")
+            return
+
+        if len(pesel) != 11 or not pesel.isdigit():
+            QMessageBox.warning(self, "Błąd", "PESEL musi składać się z 11 cyfr.")
+            return
+
+        conn = None
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
 
             cursor.execute("SELECT id FROM users WHERE login = %s", (login,))
             if cursor.fetchone():
-                self.show_error_popup("Taki login już istnieje!")
+                QMessageBox.warning(self, "Błąd", "Taki login jest już zajęty!")
+                return
+
+            cursor.execute("SELECT id FROM users WHERE id = %s", (pesel,))
+            if cursor.fetchone():
+                QMessageBox.warning(self, "Błąd", "Użytkownik o takim numerze PESEL już istnieje!")
                 return
 
             hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -93,61 +159,14 @@ class RegisterWindow(QWidget):
 
             conn.commit()
 
-            self.login_user(login, password)
+            QMessageBox.information(self, "Sukces", "Konto utworzone pomyślnie!\nZaloguj się teraz.")
+            self.show_login()
 
         except Exception as e:
-            self.show_error_popup(f"Błąd podczas rejestracji: {e}")
+            if conn: conn.rollback()
+            QMessageBox.critical(self, "Błąd Bazy", f"Wystąpił błąd podczas rejestracji: {e}")
 
         finally:
-            if 'conn' in locals():
+            if conn:
                 cursor.close()
                 conn.close()
-
-    def login_user(self):
-        try:
-            self.conn = psycopg2.connect(conn_str)
-            cursor = self.conn.cursor()
-
-            cursor.execute("SELECT id, password, role FROM users WHERE login = %s", (self.login_box.text(),))
-            result = cursor.fetchone()
-
-            if result is None:
-                self.show_error_popup("Nie znaleziono takiego użytkownika.")
-                return
-
-            user_id, password_hash, role = result
-
-            if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
-                self.show_success_popup()
-                self.open_main_window(user_id)
-            else:
-                self.show_error_popup("Niepoprawne hasło.")
-
-        except Exception as e:
-            self.show_error_popup(f"Błąd połączenia lub logowania: {e}")
-
-        finally:
-            if 'conn' in locals():
-                cursor.close()
-                self.conn.close()
-
-    def show_success_popup(self, message):
-        QMessageBox.information(self, "Sukces", message, QMessageBox.Ok)
-
-    def show_error_popup(self, message):
-        QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
-
-    def open_main_window(self, user_id):
-        from MainWindow import MainWindow
-        self.close()
-        self.main_window = MainWindow(user_id)
-        self.main_window.show()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    window = RegisterWindow()
-    window.show()
-
-    app.exec()

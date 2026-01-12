@@ -1,189 +1,269 @@
+import psycopg2
 from datetime import datetime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame)
-from PySide6.QtCore import Qt
-from BaseWindow import BaseWindow
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtWidgets import QListWidgetItem, QHBoxLayout  # Potrzebne do nadpisania add_list_items
+from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO DODAWANIA WIZYTY ---
-class AddVisitWindow(QDialog):
-    def __init__(self, parent=None):
+# --- OKNO ZLECANIA BADANIA (NOWE) ---
+class AddLabTestWindow(QDialog):
+    def __init__(self, visit_id, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Dodaj Nową Wizytę")
-        self.setGeometry(300, 300, 400, 300)
+        self.visit_id = visit_id
+        self.setWindowTitle("Zleć Badanie")
+        self.resize(400, 250)
+
         layout = QVBoxLayout(self)
+        layout.setSpacing(15)
 
-        layout.addWidget(QLabel("<h2>Dodaj Wizytę</h2>"))
-        self.date_in = QLineEdit()
-        self.date_in.setPlaceholderText("RRRR-MM-DD GG:MM")
+        layout.addWidget(QLabel("<h2>Nowe Zlecenie Laboratoryjne</h2>"))
+        layout.addWidget(QLabel("Nazwa badania (np. Morfologia, RTG):"))
+
         self.title_in = QLineEdit()
-        self.title_in.setPlaceholderText("Tytuł wizyty")
-        self.pesel_in = QLineEdit()
-        self.pesel_in.setPlaceholderText("PESEL Pacjenta")
-
-        layout.addWidget(QLabel("Data:"))
-        layout.addWidget(self.date_in)
-        layout.addWidget(QLabel("Tytuł:"))
+        self.title_in.setPlaceholderText("Wpisz nazwę badania...")
         layout.addWidget(self.title_in)
-        layout.addWidget(QLabel("Pacjent (PESEL):"))
-        layout.addWidget(self.pesel_in)
 
-        btn = QPushButton("Zatwierdź")
+        info_lbl = QLabel("Opis/Wyniki zostaną uzupełnione przez Laboranta.")
+        info_lbl.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        layout.addWidget(info_lbl)
+
+        layout.addStretch()
+
+        btn = QPushButton("ZLEĆ BADANIE")
+        btn.setFixedHeight(45)
+        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px;")
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
     def save(self):
-        # Tutaj w przyszłości dodasz INSERT INTO visits...
-        QMessageBox.information(self, "Info", "Wizyta dodana (placeholder).")
-        self.accept()
+        title = self.title_in.text().strip()
+
+        if not title:
+            QMessageBox.warning(self, "Błąd", "Podaj nazwę badania.")
+            return
+
+        try:
+            conn = psycopg2.connect(conn_str)
+            cursor = conn.cursor()
+            # Wstawiamy tylko tytuł i ID wizyty. Opis (description) zostawiamy pusty (NULL) dla laboranta.
+            cursor.execute("INSERT INTO lab_tests (visit_id, title) VALUES (%s, %s)",
+                           (self.visit_id, title))
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "Sukces", "Badanie zostało zlecone.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Błąd Bazy", str(e))
+
+
+# --- OKNO DODAWANIA WIZYTY (Bez zmian) ---
+class AddVisitWindow(QDialog):
+    def __init__(self, doctor_id, parent=None):
+        super().__init__(parent)
+        self.doctor_id = doctor_id
+        self.setWindowTitle("Dodaj Nową Wizytę")
+        self.resize(400, 400)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        layout.addWidget(QLabel("<h2>Nowa Wizyta</h2>"))
+
+        self.date_in = QLineEdit()
+        self.date_in.setPlaceholderText("YYYY-MM-DD HH:MM")
+        self.date_in.setText(datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+        self.title_in = QLineEdit()
+        self.title_in.setPlaceholderText("Np. Konsultacja")
+
+        self.pesel_in = QLineEdit()
+        self.pesel_in.setPlaceholderText("PESEL Pacjenta")
+
+        for lbl, widget in [("Data:", self.date_in), ("Tytuł:", self.title_in), ("Pacjent (PESEL):", self.pesel_in)]:
+            layout.addWidget(QLabel(lbl))
+            layout.addWidget(widget)
+
+        layout.addStretch()
+
+        btn = QPushButton("ZATWIERDŹ")
+        btn.setFixedHeight(50)
+        btn.setStyleSheet("background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px;")
+        btn.clicked.connect(self.save)
+        layout.addWidget(btn)
+
+    def save(self):
+        date_text = self.date_in.text().strip()
+        title = self.title_in.text().strip()
+        pesel = self.pesel_in.text().strip()
+
+        if not date_text or not title or not pesel:
+            QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola.")
+            return
+
+        if len(pesel) != 11 or not pesel.isdigit():
+            QMessageBox.warning(self, "Błąd", "PESEL musi mieć 11 cyfr.")
+            return
+
+        try:
+            valid_date = datetime.strptime(date_text, "%Y-%m-%d %H:%M")
+        except ValueError:
+            QMessageBox.warning(self, "Błąd", "Zły format daty. Wymagany: RRRR-MM-DD GG:MM")
+            return
+
+        try:
+            conn = psycopg2.connect(conn_str)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO visits (visit_date, title, pesel, doctor_id) VALUES (%s, %s, %s, %s)",
+                           (valid_date, title, pesel, self.doctor_id))
+            conn.commit()
+            conn.close()
+            QMessageBox.information(self, "Sukces", "Wizyta dodana.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Błąd", str(e))
 
 
 # --- GŁÓWNE OKNO LEKARZA ---
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
-        # Zmienna przechowująca PESEL pacjenta, jeśli kod został zweryfikowany
-        self.searched_pesel = None
         super().__init__(user_id, "Lekarz")
+        self.code_input = None
         self.init_ui()
 
     def setup_sidebar_widgets(self):
-        # 1. Info o lekarzu
         self.setup_info_widget("PANEL LEKARZA", f"ID: {self.user_id}")
 
-        # 2. Sekcja weryfikacji kodu pacjenta
         search_frame = QFrame(self)
-        search_frame.setFixedSize(250, 140)
+        search_frame.setFixedHeight(150)
         search_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 15px;
-                border: 2px solid #555;
-            }
+            QFrame { background-color: white; border-radius: 10px; border: 2px solid #CCC; }
         """)
+
         layout = QVBoxLayout(search_frame)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(5)
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        lbl = QLabel("DOSTĘP DO HISTORII", search_frame)
-        lbl.setStyleSheet("font-weight: bold; color: #333; font-size: 11px; border: none;")
+        lbl = QLabel("DOSTĘP DO PACJENTA", search_frame)
+        lbl.setStyleSheet("color: #333; font-weight: bold; font-size: 11px; border: none;")
 
         self.code_input = QLineEdit(search_frame)
-        self.code_input.setPlaceholderText("Wpisz kod pacjenta")
+        self.code_input.setPlaceholderText("Kod (6 cyfr)")
         self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_input.setStyleSheet("border: 1px solid #aaa; padding: 5px; border-radius: 5px; color: black;")
+        self.code_input.setStyleSheet("border: 1px solid #AAA; border-radius: 5px; padding: 5px; color: black;")
 
-        btn_check = QPushButton("Odblokuj dane", search_frame)
-        btn_check.setStyleSheet("""
-            QPushButton {
-                background-color: #2F9ADF; 
-                color: white; 
-                border-radius: 5px; 
-                padding: 5px;
-                font-weight: bold;
-            }
+        search_btn = QPushButton("POBIERZ HISTORIĘ", search_frame)
+        search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        search_btn.setStyleSheet("""
+            QPushButton { background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px; padding: 5px; border: none;}
             QPushButton:hover { background-color: #1F8ACF; }
         """)
-        btn_check.clicked.connect(self.verify_patient_code)
-
-        btn_reset = QPushButton("Pokaż mój grafik", search_frame)
-        btn_reset.setStyleSheet("""
-            QPushButton {
-                background-color: #ddd; 
-                color: #333; 
-                border-radius: 5px; 
-                padding: 5px;
-                font-size: 10px;
-            }
-            QPushButton:hover { background-color: #ccc; }
-        """)
-        btn_reset.clicked.connect(self.reset_view)
+        search_btn.clicked.connect(self.load_patient_by_code)
 
         layout.addWidget(lbl)
         layout.addWidget(self.code_input)
-        layout.addWidget(btn_check)
-        layout.addWidget(btn_reset)
+        layout.addWidget(search_btn)
 
-        self.side_layout.addWidget(search_frame, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.side_layout.addWidget(search_frame)
 
     def setup_extra_buttons(self):
-        btn = self.add_button("dodaj nową wizytę")
-        btn.clicked.connect(self.open_add_visit)
+        self.add_button("MÓJ HARMONOGRAM").clicked.connect(self.reset_to_my_schedule)
+        self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
+        # NOWY PRZYCISK
+        self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 
     def open_add_visit(self):
-        AddVisitWindow(self).exec()
+        if AddVisitWindow(self.user_id, self).exec():
+            self.refresh_list()
 
-    def verify_patient_code(self):
-        """Sprawdza kod w bazie i jeśli poprawny, pobiera PESEL"""
-        code = self.code_input.text().strip()
-        if not code:
-            QMessageBox.warning(self, "Błąd", "Wprowadź kod.")
+    def open_add_lab_test(self):
+        # Sprawdzamy czy coś jest zaznaczone
+        if not self.current_selected_frame:
+            QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy, do której chcesz zlecić badanie.")
             return
 
-        if not self.connection:
+        # Pobieramy ukryte ID wizyty z właściwości widgetu
+        visit_id = self.current_selected_frame.property("visit_id")
+
+        if not visit_id:
+            QMessageBox.critical(self, "Błąd", "Nie udało się pobrać ID wizyty.")
             return
 
-        try:
-            with self.connection.cursor() as cursor:
-                # Sprawdź kod I czy czas wygaśnięcia jest w przyszłości (> NOW())
-                query = """
-                    SELECT pesel 
-                    FROM patient_codes 
-                    WHERE code = %s AND expiration_time > NOW()
-                """
-                cursor.execute(query, (code,))
-                result = cursor.fetchone()
+        AddLabTestWindow(visit_id, self).exec()
 
-                if result:
-                    self.searched_pesel = result[0]  # Zapisz znaleziony PESEL
-                    QMessageBox.information(self, "Sukces",
-                                            f"Kod poprawny. Wyświetlam historię pacjenta: {self.searched_pesel}")
-                    self.refresh_list()  # Odśwież listę (teraz użyje searched_pesel)
-                else:
-                    QMessageBox.critical(self, "Błąd", "Kod nieprawidłowy lub wygasł.")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Błąd bazy", str(e))
-
-    def reset_view(self):
-        """Wraca do widoku własnego grafiku lekarza"""
-        self.searched_pesel = None
-        self.code_input.clear()
-        self.refresh_list()
-        QMessageBox.information(self, "Widok", "Powrót do Twojego grafiku wizyt.")
-
-    def refresh_list(self):
-        """
-        Nadpisujemy funkcję z BaseWindow, aby obsłużyć dwa tryby:
-        1. Grafik Lekarza (gdy self.searched_pesel is None)
-        2. Historia Pacjenta (gdy self.searched_pesel ma wartość)
-        """
+    def reset_to_my_schedule(self):
         self.lista_wizyt.clear()
+        self.refresh_list()
 
-        if not self.connection:
+    def get_sql_query(self):
+        # Zmienione zapytanie - pobieramy też ID wizyty (pierwsza kolumna)
+        return "SELECT id, visit_date, title, pesel FROM visits WHERE doctor_id = %s"
+
+    def load_patient_by_code(self):
+        code = self.code_input.text().strip()
+        if len(code) != 6:
+            QMessageBox.warning(self, "Błąd", "Kod musi mieć 6 cyfr.")
             return
+
+        if not self.connection: return
 
         try:
             with self.connection.cursor() as cursor:
-                if self.searched_pesel:
-                    # TRYB 2: Widok Pacjenta (Wszystkie jego wizyty, kolumna 3 to ID Lekarza)
-                    query = """
-                        SELECT visit_date, title, doctor_id 
-                        FROM visits 
-                        WHERE pesel = %s
-                    """
-                    cursor.execute(query, (self.searched_pesel,))
-                else:
-                    # TRYB 1: Widok Lekarza (Jego wizyty, kolumna 3 to PESEL Pacjenta)
-                    query = """
-                        SELECT visit_date, title, pesel 
-                        FROM visits 
-                        WHERE doctor_id = %s
-                    """
-                    cursor.execute(query, (self.user_id,))
+                cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
+                               (code, datetime.now()))
+                res = cursor.fetchone()
+                if not res:
+                    QMessageBox.warning(self, "Błąd", "Kod nieprawidłowy lub wygasł.")
+                    return
 
+                pesel = res[0]
+                # Tu też pobieramy ID wizyty
+                cursor.execute(
+                    "SELECT id, visit_date, title, doctor_id FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
+                    (pesel,))
                 rows = cursor.fetchall()
+
+                self.lista_wizyt.clear()
                 self.add_list_items(rows)
 
+                QMessageBox.information(self, "Sukces", f"Wczytano pacjenta: {pesel}")
         except Exception as e:
-            print(f"Błąd pobierania danych: {e}")
-            QMessageBox.critical(self, "Błąd", f"Nie udało się pobrać danych: {e}")
+            QMessageBox.critical(self, "Błąd", str(e))
+
+    # --- NADPISANIE FUNKCJI Z BaseWindow ABY OBSŁUŻYĆ ID WIZYTY ---
+    def add_list_items(self, data_rows):
+        styles = ["background-color: #FFFFFF;", "background-color: #F0F0F0;"]
+
+        # data_rows zawiera teraz 4 elementy: (id, data, tytul, osoba)
+        for i, (vid, data, tytul, osoba) in enumerate(data_rows):
+            data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
+            osoba_str = str(osoba)
+
+            list_item = QListWidgetItem()
+            # UserRole przechowuje dane do wyświetlania szczegółów (kompatybilność z BaseWindow)
+            list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, osoba_str))
+
+            frame = QFrame()
+            frame.setFixedHeight(60)
+            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD;")
+
+            # --- KLUCZOWE: Zapamiętujemy ID wizyty w ramce ---
+            frame.setProperty("visit_id", vid)
+
+            hl = QHBoxLayout(frame)
+            hl.setContentsMargins(10, 0, 10, 0)
+
+            labels = [data_str, tytul, osoba_str]
+            for j, txt in enumerate(labels):
+                lbl = QLabel(txt)
+                lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+                lbl.setStyleSheet("border: none; color: #333; font-size: 13px;")
+                hl.addWidget(lbl, stretch=1 if j == 1 else 0)
+                if j < 2: hl.addSpacing(20)
+
+            self.lista_wizyt.addItem(list_item)
+            list_item.setSizeHint(QSize(0, 60))
+            self.lista_wizyt.setItemWidget(list_item, frame)
