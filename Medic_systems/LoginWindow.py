@@ -9,91 +9,78 @@ conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-
         self.setWindowTitle("MedEX-POL Logowanie")
         self.set_palette()
 
-        self.login_box = QLineEdit('', self)
+        self.login_box = QLineEdit(self)
         self.login_box.setPlaceholderText("Login")
-        self.password_box = QLineEdit('', self)
+        self.password_box = QLineEdit(self)
         self.password_box.setPlaceholderText("Hasło")
         self.password_box.setEchoMode(QLineEdit.Password)
 
-        Login_button = QPushButton("Zaloguj się", self)
-        Login_button.clicked.connect(self.login_user)
+        btn_login = QPushButton("Zaloguj się", self)
+        btn_login.clicked.connect(self.login_user)
 
-        Register_button = QPushButton("Zarejestruj się", self)
-        Register_button.clicked.connect(self.show_register)
+        btn_reg = QPushButton("Zarejestruj się", self)
+        btn_reg.clicked.connect(self.show_register)
 
-        self.login_box.setFixedWidth(200)
-        self.password_box.setFixedWidth(200)
-        Login_button.setFixedWidth(200)
-        Register_button.setFixedWidth(200)
-
-        layout_login = QVBoxLayout(self)
-        layout_login.addWidget(self.login_box)
-        layout_login.addWidget(self.password_box)
-        layout_login.addWidget(Login_button)
-        layout_login.addWidget(Register_button)
-
-        layout_login.setStretch(0, 0)
-        layout_login.setStretch(1, 0)
-        layout_login.setStretch(2, 0)
-        layout_login.setStretch(3, 0)
-
-        self.setLayout(layout_login)
-
+        # Layout (skrócony dla czytelności)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.login_box)
+        layout.addWidget(self.password_box)
+        layout.addWidget(btn_login)
+        layout.addWidget(btn_reg)
         self.setFixedSize(230, 170)
 
     def set_palette(self):
-        palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(qRgb(172, 248, 122)))
-        self.setPalette(palette)
+        p = self.palette()
+        p.setColor(QPalette.ColorRole.Window, QColor(qRgb(172, 248, 122)))
+        self.setPalette(p)
 
     def show_register(self):
         from RegisterWindow import RegisterWindow
         self.close()
-        self.register_window = RegisterWindow()
-        self.register_window.show()
+        self.reg = RegisterWindow()
+        self.reg.show()
 
     def login_user(self):
         try:
-            self.conn = psycopg2.connect(conn_str)
-            cursor = self.conn.cursor()
+            conn = psycopg2.connect(conn_str)
+            cur = conn.cursor()
+            cur.execute("SELECT id, password, role FROM users WHERE login = %s", (self.login_box.text(),))
+            res = cur.fetchone()
+            conn.close()
 
-            cursor.execute("SELECT id, password, role FROM users WHERE login = %s", (self.login_box.text(),))
-            result = cursor.fetchone()
-
-            if result is None:
-                self.show_error_popup("Nie znaleziono takiego użytkownika.")
+            if not res:
+                QMessageBox.critical(self, "Błąd", "Brak użytkownika.")
                 return
 
-            user_id, password_hash, role = result
+            uid, phash, role = res
 
-            print(role)
-
-            if bcrypt.checkpw(self.password_box.text().encode("utf-8"), password_hash.encode("utf-8")):
-                self.show_success_popup()
-                self.open_main_window(user_id, role)
+            # Weryfikacja hasła
+            if bcrypt.checkpw(self.password_box.text().encode("utf-8"), phash.encode("utf-8")):
+                self.open_main_window(uid, role)
             else:
-                self.show_error_popup("Niepoprawne hasło.")
+                QMessageBox.critical(self, "Błąd", "Złe hasło.")
 
         except Exception as e:
-            self.show_error_popup(f"Błąd połączenia lub logowania: {e}")
+            QMessageBox.critical(self, "Błąd", str(e))
 
-        finally:
-            if 'conn' in locals():
-                cursor.close()
-                self.conn.close()
-
-    def show_success_popup(self):
-        QMessageBox.information(self, "Zalogowano Pomyślnie!", f"Dzień dobry, {self.login_box.text()}!", QMessageBox.Ok)
-
-    def show_error_popup(self, message):
-        QMessageBox.critical(self, "Błąd", message, QMessageBox.Ok)
-
-    def open_main_window(self,user_id, role):
-        from MainWindow import MainWindow
+    def open_main_window(self, user_id, role):
         self.close()
-        self.main_window = MainWindow(user_id, role)
-        self.main_window.show()
+
+        # TUTAJ JEST KLUCZOWA ZMIANA - IMPORTUJEMY ODPOWIEDNIE OKNO
+        if role == "Pacjent":
+            from PatientWindow import PatientWindow
+            self.win = PatientWindow(user_id)
+        elif role == "Lekarz":
+            from DoctorWindow import DoctorWindow
+            self.win = DoctorWindow(user_id)
+        elif role == "Laborant":
+            from LaborantWindow import LaborantWindow
+            self.win = LaborantWindow(user_id)
+        else:
+            QMessageBox.critical(self, "Błąd", f"Nieznana rola: {role}")
+            return
+
+        self.win.show()
