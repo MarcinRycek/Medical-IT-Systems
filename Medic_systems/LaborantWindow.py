@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO WPISYWANIA WYNIKÓW (Bez zmian - styl czarny tekst) ---
+# --- OKNO WPISYWANIA WYNIKÓW ---
 class FillLabResultWindow(QDialog):
     def __init__(self, test_id, test_title, parent=None):
         super().__init__(parent)
@@ -89,29 +89,35 @@ class FillLabResultWindow(QDialog):
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Laborant")
-        # Automatyczne ładowanie nastąpi dzięki init_ui -> refresh_list -> get_sql_query
         self.init_ui()
 
     def setup_sidebar_widgets(self):
         self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
 
+        info_frame = QFrame(self)
+        info_frame.setStyleSheet("""
+            QFrame { background-color: white; border: 2px solid #CCC; border-radius: 10px; }
+            QLabel { color: #333; }
+        """)
+        layout = QVBoxLayout(info_frame)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        lbl = QLabel("TRYB PRACY:\nWSZYSTKIE ZLECENIA", info_frame)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setStyleSheet("font-weight: bold; font-size: 12px; border: none;")
 
-
-
-
+        layout.addWidget(lbl)
+        self.side_layout.addWidget(info_frame)
 
     def setup_extra_buttons(self):
-        # Przycisk do ręcznego odświeżania listy (np. gdy lekarz dodał coś przed chwilą)
-        self.add_button("ODŚWIEŻ LISTĘ").clicked.connect(self.refresh_list)
-
-        # Przycisk do wpisywania wyników
+        self.add_button("ODŚWIEŻ LISTĘ").clicked.connect(self.reset_to_pending)
         self.add_button("WPISZ WYNIKI").clicked.connect(self.open_fill_result)
 
+    def reset_to_pending(self):
+        self.refresh_list()
+
     def get_sql_query(self):
-        # --- ZMIANA LOGIKI ---
-        # Pobieramy WSZYSTKIE badania, które nie mają opisu (description IS NULL lub pusty string)
-        # Niezależnie od pacjenta.
+        # Zapytanie BEZ parametrów (%s)
         return """
             SELECT t.id, v.visit_date, t.title, v.pesel 
             FROM lab_tests t
@@ -120,12 +126,31 @@ class LaborantWindow(BaseWindow):
             ORDER BY v.visit_date DESC
         """
 
+    # --- NADPISUJEMY REFRESH_LIST ABY NAPRAWIĆ BŁĄD PARAMETRÓW ---
+    def refresh_list(self):
+        self.current_selected_frame = None
+        self.current_selected_data = None
+        self.lista_wizyt.clear()
+
+        query = self.get_sql_query()
+        if not query or not self.connection: return
+
+        try:
+            with self.connection.cursor() as cursor:
+                # TU JEST ZMIANA: Wykonujemy execute(query) BEZ (self.user_id,)
+                # ponieważ nasze zapytanie nie ma "%s"
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                self.add_list_items(rows)
+        except Exception as e:
+            print(f"SQL Error: {e}")
+            QMessageBox.warning(self, "Błąd SQL", str(e))
+
     def open_fill_result(self):
         if not self.current_selected_frame:
             QMessageBox.warning(self, "Uwaga", "Wybierz badanie z listy, aby wpisać wynik.")
             return
 
-        # Pobieramy ukryte ID badania
         test_id = self.current_selected_frame.property("test_id")
         test_title = self.current_selected_frame.property("test_title")
 
@@ -133,43 +158,34 @@ class LaborantWindow(BaseWindow):
             QMessageBox.critical(self, "Błąd", "Nie można zidentyfikować badania.")
             return
 
-        # Otwieramy okno edycji
         if FillLabResultWindow(test_id, test_title, self).exec():
-            # Po pomyślnym zapisie odświeżamy listę -> wykonane badanie zniknie z listy "Do zrobienia"
             self.refresh_list()
 
-    # --- NADPISANIE FUNKCJI LISTY (Styl czarny tekst, układ kolumn) ---
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 
-        # data_rows: (test_id, data_wizyty, tytul_badania, pesel)
         for i, (tid, data, tytul, pesel) in enumerate(data_rows):
             data_str = data.strftime("%Y-%m-%d") if data else ""
             pesel_str = str(pesel)
 
             list_item = QListWidgetItem()
-            # Dane dla okna szczegółów (kompatybilność z BaseWindow)
             list_item.setData(Qt.ItemDataRole.UserRole, (data_str, f"BADANIE: {tytul}", pesel_str))
 
             frame = QFrame()
             frame.setFixedHeight(60)
-            # Styl z czarnym tekstem
             frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #AAA; color: black;")
 
-            # --- ZAPAMIĘTUJEMY ID BADANIA ---
             frame.setProperty("test_id", tid)
             frame.setProperty("test_title", tytul)
 
             hl = QHBoxLayout(frame)
             hl.setContentsMargins(10, 0, 10, 0)
 
-            # Wyświetlamy: Data | Nazwa Badania | PESEL
             labels = [data_str, tytul.upper(), pesel_str]
             for j, txt in enumerate(labels):
                 lbl = QLabel(txt)
                 lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-                # Stylizacja środkowej kolumny (tytuł badania)
                 if j == 1:
                     lbl.setStyleSheet("border: none; color: #2F9ADF; font-weight: bold; font-size: 13px;")
                 else:
