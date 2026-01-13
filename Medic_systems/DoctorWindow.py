@@ -192,6 +192,7 @@ class DoctorWindow(BaseWindow):
         self.side_layout.addWidget(search_frame)
 
     def setup_extra_buttons(self):
+        # Usunięto przycisk "Mój Harmonogram" - lekarz widzi tylko po wpisaniu kodu
         self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
         self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 

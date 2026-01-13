@@ -1,14 +1,9 @@
 import psycopg2
-import random
-from datetime import datetime, timedelta  # <--- NOWY WYMAGANY IMPORT
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-                               QPushButton, QListWidget, QListWidgetItem,
-                               QDialog, QMessageBox, QLineEdit)
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QListWidget, QSizePolicy, \
+    QListWidgetItem, QDialog, QMessageBox, QLineEdit
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
-
-# --- OKNO SZCZEGÓŁÓW WIZYTY ---
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, parent=None):
         super().__init__(parent)
@@ -26,7 +21,6 @@ class VisitDetailsWindow(QDialog):
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
 
-# --- OKNO DODAWANIA WIZYTY (Tylko dla lekarza) ---
 class AddVisitWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,8 +31,8 @@ class AddVisitWindow(QDialog):
         layout.addWidget(QLabel(f"<h2>Dodaj Nową Wizytę</h2>", self))
         layout.addWidget(QLabel(f"<b>Wprowadź dane wizyty:</b>", self))
 
+
         self.date_input = QLineEdit(self)
-        self.date_input.setPlaceholderText("RRRR-MM-DD GG:MM")
         self.title_input = QLineEdit(self)
         self.doctor_input = QLineEdit(self)
 
@@ -46,7 +40,7 @@ class AddVisitWindow(QDialog):
         layout.addWidget(self.date_input)
         layout.addWidget(QLabel("Tytuł:", self))
         layout.addWidget(self.title_input)
-        layout.addWidget(QLabel("ID Doktora/Laboranta:", self))
+        layout.addWidget(QLabel("Doktor/Laborant:", self))
         layout.addWidget(self.doctor_input)
 
         add_button = QPushButton("Dodaj Wizytę", self)
@@ -58,11 +52,11 @@ class AddVisitWindow(QDialog):
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
     def _add_visit(self):
-        QMessageBox.information(self, "Dodaj Wizytę", "Funkcja w przygotowaniu (placeholder).")
+        QMessageBox.information(self, "Dodaj Wizytę", "Wizytę została dodana (placeholder).")
+
         self.accept()
 
 
-# --- OKNO WYLOGOWANIA ---
 class LogoutWindow(QDialog):
     def __init__(self, parent=None, on_logged_out=None):
         super().__init__(parent)
@@ -85,32 +79,30 @@ class LogoutWindow(QDialog):
 
     def _logout(self):
         QMessageBox.information(self, "Wylogowanie", "Zostałeś wylogowany.")
+
         self.accept()
+
         if self.on_logged_out:
             self.on_logged_out()
 
-
-# --- GŁÓWNE OKNO APLIKACJI ---
 class MainWindow(QWidget):
-    def __init__(self, logged_in_user_id, role):
+    def __init__(self, logged_in_user_id):
         super().__init__()
-        self.logged_in_user_id = logged_in_user_id
-        self.role = role
-
-        self.setWindowTitle(f"MedEX-POL - Panel: {self.role}")
+        self.setWindowTitle("MedEX-POL")
         self.setGeometry(100, 100, 1200, 700)
         self.set_palette()
 
         self.current_selected_frame = None
         self.current_selected_data = None
+
+        self.logged_in_user_id = logged_in_user_id
+
         self.connection = self.connect_to_database()
 
-        # Główny Layout
         main_h_layout = QHBoxLayout(self)
         main_h_layout.setContentsMargins(0, 0, 0, 0)
         main_h_layout.setSpacing(0)
 
-        # --- PANEL BOCZNY (Lewa strona) ---
         side_panel = QFrame(self)
         side_panel.setFixedWidth(300)
         side_panel.setStyleSheet("background-color: rgb(172, 248, 122);")
@@ -118,27 +110,50 @@ class MainWindow(QWidget):
         side_layout.setSpacing(40)
         side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         side_layout.setContentsMargins(20, 150, 20, 20)
+        # ===== KOD PACJENTA =====
+        patient_code = self.fetch_patient_code()
+        code_text = str(patient_code) if patient_code else "------"
 
-        # 1. Element warunkowy: KOD PACJENTA (interaktywny) lub INFO O ROLI
-        if self.role == "Pacjent":
-            self.setup_patient_code_widget(side_layout)
-        else:
-            self.setup_staff_info_widget(side_layout)
+        code_frame = QFrame(self)
+        code_frame.setFixedSize(250, 80)
+        code_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 15px;
+                border: 2px solid #CCCCCC;
+            }
+        """)
 
-        # 2. Przyciski Menu
-        zobacz_wizyte_btn = self.add_button(side_layout, "zobacz szczegóły")
-        zobacz_wizyte_btn.clicked.connect(self._show_visit_details)
+        code_layout = QVBoxLayout(code_frame)
+        code_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        if self.role == "Lekarz":
-            dodaj_wizyte_btn = self.add_button(side_layout, "dodaj nową wizytę")
-            dodaj_wizyte_btn.clicked.connect(self._show_add_visit_window)
+        code_label_title = QLabel("KOD PACJENTA", code_frame)
+        code_label_title.setStyleSheet("color: #666666; font-size: 12px;")
 
+        code_label = QLabel(code_text, code_frame)
+        code_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #000000;
+        """)
+
+        code_layout.addWidget(code_label_title)
+        code_layout.addWidget(code_label)
+
+        side_layout.addWidget(code_frame, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # ===== PRZYCISK =====
+        zobacz_wizyte_btn = self.add_button(side_layout, "zobacz wizytę")
+        dodaj_wizyte_btn = self.add_button(side_layout, "dodaj nową wizytę")
         wyloguj_btn = self.add_button(side_layout, "wyloguj")
-        wyloguj_btn.clicked.connect(self._show_logout_window)
 
         side_layout.addStretch(1)
 
-        # --- PANEL GŁÓWNY (Prawa strona) ---
+        zobacz_wizyte_btn.clicked.connect(self._show_visit_details)
+        dodaj_wizyte_btn.clicked.connect(self._show_add_visit_window)
+        wyloguj_btn.clicked.connect(self._show_logout_window)
+
         main_content_frame = QFrame(self)
         main_content_frame.setStyleSheet("background-color: rgb(172, 248, 122);")
         main_v_layout = QVBoxLayout(main_content_frame)
@@ -152,6 +167,7 @@ class MainWindow(QWidget):
         self.lista_wizyt.setFrameShape(QFrame.Shape.NoFrame)
         self.lista_wizyt.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.lista_wizyt.setMinimumSize(QSize(100, 100))
+
         self.lista_wizyt.itemClicked.connect(self._handle_item_clicked)
 
         self.add_list_items()
@@ -162,121 +178,16 @@ class MainWindow(QWidget):
         main_h_layout.addWidget(main_content_frame)
         self.setLayout(main_h_layout)
 
-    def setup_patient_code_widget(self, layout):
-        """Wyświetla kod pacjenta oraz przycisk do jego generowania"""
-        patient_code = self.fetch_patient_code()
-        code_text = str(patient_code) if patient_code else "------"
-
-        code_frame = QFrame(self)
-        code_frame.setFixedSize(250, 120)
-        code_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 15px;
-                border: 2px solid #CCCCCC;
-            }
-        """)
-        code_layout = QVBoxLayout(code_frame)
-        code_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        code_layout.setSpacing(5)
-
-        code_label_title = QLabel("KOD PACJENTA", code_frame)
-        code_label_title.setStyleSheet("color: #666666; font-size: 12px; border: none;")
-
-        self.code_label = QLabel(code_text, code_frame)
-        self.code_label.setStyleSheet(
-            "font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #000000; border: none;")
-
-        generate_btn = QPushButton("Generuj nowy kod", code_frame)
-        generate_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2F9ADF;
-                color: white;
-                font-size: 11px;
-                border-radius: 5px;
-                padding: 4px;
-                border: none;
-            }
-            QPushButton:hover {
-                background-color: #1F8ACF;
-            }
-        """)
-        generate_btn.clicked.connect(self.generate_new_patient_code)
-
-        code_layout.addWidget(code_label_title, alignment=Qt.AlignmentFlag.AlignCenter)
-        code_layout.addWidget(self.code_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        code_layout.addWidget(generate_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        layout.addWidget(code_frame, alignment=Qt.AlignmentFlag.AlignCenter)
-
-    def generate_new_patient_code(self):
-        """Generuje losowy kod i ustawia czas ważności (NAPRAWIONE)"""
-        if not self.connection:
-            QMessageBox.critical(self, "Błąd", "Brak połączenia z bazą danych.")
-            return
-
-        # 1. Generowanie losowego kodu
-        new_code = str(random.randint(100000, 999999))
-
-        # 2. Obliczanie czasu wygaśnięcia (Teraz + 15 minut)
-        expiration_time = datetime.now() + timedelta(minutes=15)
-
-        try:
-            with self.connection.cursor() as cursor:
-                # Sprawdzenie czy użytkownik ma już wpis
-                cursor.execute("SELECT 1 FROM patient_codes WHERE pesel = %s", (self.logged_in_user_id,))
-                exists = cursor.fetchone()
-
-                if exists:
-                    # Aktualizacja kodu I czasu wygaśnięcia
-                    cursor.execute("""
-                        UPDATE patient_codes 
-                        SET code = %s, expiration_time = %s 
-                        WHERE pesel = %s
-                    """, (new_code, expiration_time, self.logged_in_user_id))
-                else:
-                    # Wstawienie nowego wiersza z czasem wygaśnięcia
-                    cursor.execute("""
-                        INSERT INTO patient_codes (pesel, code, expiration_time) 
-                        VALUES (%s, %s, %s)
-                    """, (self.logged_in_user_id, new_code, expiration_time))
-
-                self.connection.commit()
-
-                self.code_label.setText(new_code)
-                QMessageBox.information(self, "Sukces", "Wygenerowano nowy kod pacjenta (ważny 15 min)!")
-
-        except Exception as e:
-            self.connection.rollback()
-            QMessageBox.critical(self, "Błąd", f"Nie udało się wygenerować kodu: {e}")
-
-    def setup_staff_info_widget(self, layout):
-        info_frame = QFrame(self)
-        info_frame.setFixedSize(250, 80)
-        info_frame.setStyleSheet("""
-            QFrame {
-                background-color: #555555;
-                border-radius: 15px;
-            }
-        """)
-        info_layout = QVBoxLayout(info_frame)
-        info_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        role_label = QLabel(f"PANEL {self.role.upper()}A", info_frame)
-        role_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
-
-        user_label = QLabel(f"ID: {self.logged_in_user_id}", info_frame)
-        user_label.setStyleSheet("color: #DDDDDD; font-size: 12px;")
-
-        info_layout.addWidget(role_label)
-        info_layout.addWidget(user_label)
-        layout.addWidget(info_frame, alignment=Qt.AlignmentFlag.AlignCenter)
-
     def fetch_patient_code(self):
-        if not self.connection or self.role != "Pacjent":
+        if not self.connection:
             return None
 
-        query = "SELECT code FROM patient_codes WHERE pesel = %s LIMIT 1"
+        query = """
+        SELECT code
+        FROM patient_codes
+        WHERE pesel = %s
+        LIMIT 1
+        """
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, (self.logged_in_user_id,))
@@ -285,70 +196,6 @@ class MainWindow(QWidget):
         except Exception as e:
             print(f"Error fetching patient code: {e}")
             return None
-
-    def fetch_visits_from_database(self):
-        if not self.connection:
-            return []
-
-        if self.role == "Pacjent":
-            query = """
-            SELECT visit_date, title, coalesce(doctor_id, laborant_id)
-            FROM visits WHERE pesel = %s
-            """
-        elif self.role == "Lekarz":
-            query = """
-            SELECT visit_date, title, pesel 
-            FROM visits WHERE doctor_id = %s
-            """
-        elif self.role == "Laborant":
-            query = """
-            SELECT visit_date, title, pesel
-            FROM visits WHERE laborant_id = %s
-            """
-        else:
-            return []
-
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(query, (self.logged_in_user_id,))
-                return cursor.fetchall()
-        except Exception as e:
-            print(f"Error fetching data for role {self.role}: {e}")
-            return []
-
-    def add_list_items(self):
-        styles = ["background-color: #D3D3D3;", "background-color: #C4C4C4;"]
-        self.lista_wizyt.clear()
-
-        all_visits_data = self.fetch_visits_from_database()
-
-        for i, (data, tytul, osoba_powiazana) in enumerate(all_visits_data):
-            data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
-            trzecia_kolumna_tekst = str(osoba_powiazana)
-
-            list_item = QListWidgetItem()
-            list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, trzecia_kolumna_tekst))
-
-            frame = QFrame()
-            frame.setFixedHeight(70)
-            frame.setStyleSheet(styles[i % 2])
-
-            h_layout = QHBoxLayout(frame)
-            h_layout.setContentsMargins(10, 0, 10, 0)
-
-            labels_data = [data_str, tytul, trzecia_kolumna_tekst]
-
-            for j, text in enumerate(labels_data):
-                label = QLabel(str(text))
-                label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-                label.setStyleSheet(
-                    "background-color: transparent; color: #444444; font-size: 14px; font-weight: bold;")
-                h_layout.addWidget(label, stretch=1 if j == 1 else 0)
-
-            self.lista_wizyt.addItem(list_item)
-            list_item.setSizeHint(QSize(0, frame.height()))
-            self.lista_wizyt.setItemWidget(list_item, frame)
-
     def _handle_item_clicked(self, item):
         if self.current_selected_frame:
             idx = self.lista_wizyt.row(self.lista_wizyt.itemAt(self.current_selected_frame.pos()))
@@ -359,6 +206,7 @@ class MainWindow(QWidget):
         if selected_frame:
             selected_frame.setStyleSheet("background-color: #2F9ADF;")
             self.current_selected_frame = selected_frame
+
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
     def _show_add_visit_window(self):
@@ -380,11 +228,12 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Błąd", "Proszę wybrać wizytę z listy.")
             return
 
-        data, tytul, osoba = self.current_selected_data
+        data, tytul, lekarz = self.current_selected_data
+
         details_window = VisitDetailsWindow(
             data_wizyty=data,
             tytul_wizyty=tytul,
-            lekarz=osoba,
+            lekarz=lekarz,
             parent=self
         )
         details_window.exec()
@@ -420,9 +269,7 @@ class MainWindow(QWidget):
         header_layout = QHBoxLayout(header_frame)
         header_layout.setContentsMargins(10, 0, 10, 0)
 
-        trzecia_kolumna = "DOKTOR:" if self.role == "Pacjent" else "PACJENT (PESEL):"
-
-        headers = ["DATA", "OPIS:", trzecia_kolumna]
+        headers = ["DATA", "OPIS:", "DOKTOR:"]
         for i, text in enumerate(headers):
             label = QLabel(text, header_frame)
             label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -431,12 +278,67 @@ class MainWindow(QWidget):
 
         header_frame.setLayout(header_layout)
         return header_frame
-
     def connect_to_database(self):
         conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
+
         try:
             connection = psycopg2.connect(conn_str)
+            print("Successfully connected to the database!")
             return connection
         except Exception as e:
             print(f"Error connecting to the database: {e}")
             return None
+
+    def fetch_visits_from_database(self):
+        if not self.connection:
+            return []
+
+        query = """
+        SELECT visit_date, title, coalesce(doctor_id, laborant_id)
+        FROM visits
+        WHERE pesel = %s
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, (self.logged_in_user_id,))
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+            return []
+
+    def add_list_items(self):
+        styles = ["background-color: #D3D3D3;", "background-color: #C4C4C4;"]
+
+        all_visits_data = self.fetch_visits_from_database()
+
+        for i, (data, tytul, lekarz) in enumerate(all_visits_data):
+
+            data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
+
+            list_item = QListWidgetItem()
+            list_item.setData(
+                Qt.ItemDataRole.UserRole,
+                (data_str, tytul, lekarz)
+            )
+
+            frame = QFrame()
+            frame.setFixedHeight(70)
+            frame.setStyleSheet(styles[i % 2])
+
+            h_layout = QHBoxLayout(frame)
+            h_layout.setContentsMargins(10, 0, 10, 0)
+
+            labels_data = [data_str, tytul, lekarz]
+
+            for j, text in enumerate(labels_data):
+                label = QLabel(str(text))  # ← ZERO upper()
+                label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+                label.setStyleSheet(
+                    "background-color: transparent; color: #444444; "
+                    "font-size: 14px; font-weight: bold;"
+                )
+                h_layout.addWidget(label, stretch=1 if j == 1 else 0)
+
+            self.lista_wizyt.addItem(list_item)
+            list_item.setSizeHint(QSize(0, frame.height()))
+            self.lista_wizyt.setItemWidget(list_item, frame)

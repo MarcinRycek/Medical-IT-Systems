@@ -32,7 +32,7 @@ class VisitDetailsWindow(QDialog):
         lbl_date.setStyleSheet("color: black; font-size: 13px; border: none;")
         info_layout.addWidget(lbl_date)
 
-        lbl_doc = QLabel(f"<b>Prowadzący:</b> {lekarz}")
+        lbl_doc = QLabel(f"<b>Lekarz:</b> {lekarz}")
         lbl_doc.setStyleSheet("color: black; font-size: 13px; border: none;")
         info_layout.addWidget(lbl_doc)
 
