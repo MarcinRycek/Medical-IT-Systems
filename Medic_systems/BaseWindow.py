@@ -8,7 +8,7 @@ from PySide6.QtGui import QColor, QPalette, qRgb
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
 
 
-# --- OKNO SZCZEGÓŁÓW WIZYTY (STYL KLASYCZNY) ---
+# --- OKNO SZCZEGÓŁÓW WIZYTY ---
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, parent=None):
         super().__init__(parent)
@@ -54,7 +54,12 @@ class VisitDetailsWindow(QDialog):
 
             for title, desc in lab_results:
                 res_frame = QFrame()
-                res_frame.setStyleSheet("background-color: #FFFFFF; border: 1px solid #888;")
+                res_frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #FFFFFF; 
+                        border: 1px solid #888;    
+                    }
+                """)
                 res_l = QVBoxLayout(res_frame)
                 res_l.setContentsMargins(10, 10, 10, 10)
 
@@ -80,7 +85,12 @@ class VisitDetailsWindow(QDialog):
             layout.addStretch()
 
         close_button = QPushButton("Zamknij", self)
-        close_button.setStyleSheet("background-color: #CCC; color: black; border: 1px solid #888; padding: 5px;")
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: #CCC; color: black; border: 1px solid #888; padding: 5px;
+            }
+            QPushButton:hover { background-color: #BBB; }
+        """)
         close_button.clicked.connect(self.accept)
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -188,6 +198,9 @@ class BaseWindow(QWidget):
         return ""
 
     def refresh_list(self):
+        self.current_selected_frame = None
+        self.current_selected_data = None
+
         self.lista_wizyt.clear()
         query = self.get_sql_query()
         if not query or not self.connection: return
@@ -201,6 +214,11 @@ class BaseWindow(QWidget):
 
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
+
+        # Szerokości kolumn (muszą być takie same jak w nagłówku!)
+        WIDTH_DATE = 140
+        WIDTH_PERSON = 150
+
         for i, (data, tytul, osoba) in enumerate(data_rows):
             data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
             list_item = QListWidgetItem()
@@ -213,10 +231,22 @@ class BaseWindow(QWidget):
             hl = QHBoxLayout(frame)
             hl.setContentsMargins(10, 0, 10, 0)
 
-            for j, txt in enumerate([data_str, tytul, str(osoba)]):
-                lbl = QLabel(txt)
-                lbl.setStyleSheet("border: none; color: black; font-size: 13px;")
-                hl.addWidget(lbl, stretch=1 if j == 1 else 0)
+            # Kolumna 1: Data
+            lbl_date = QLabel(data_str)
+            lbl_date.setFixedWidth(WIDTH_DATE)
+            lbl_date.setStyleSheet("border: none; color: black; font-size: 13px;")
+            hl.addWidget(lbl_date)
+
+            # Kolumna 2: Opis (Stretch)
+            lbl_title = QLabel(tytul)
+            lbl_title.setStyleSheet("border: none; color: black; font-size: 13px;")
+            hl.addWidget(lbl_title, stretch=1)
+
+            # Kolumna 3: Osoba
+            lbl_person = QLabel(str(osoba))
+            lbl_person.setFixedWidth(WIDTH_PERSON)
+            lbl_person.setStyleSheet("border: none; color: black; font-size: 13px;")
+            hl.addWidget(lbl_person)
 
             self.lista_wizyt.addItem(list_item)
             list_item.setSizeHint(QSize(0, 60))
@@ -224,8 +254,23 @@ class BaseWindow(QWidget):
 
     def _handle_item_clicked(self, item):
         if self.current_selected_frame:
-            self.current_selected_frame.setStyleSheet(
-                "background-color: #EEE; color: black; border-bottom: 1px solid #AAA;")
+            try:
+                # Przywracanie koloru
+                old_index = -1
+                for i in range(self.lista_wizyt.count()):
+                    it = self.lista_wizyt.item(i)
+                    wid = self.lista_wizyt.itemWidget(it)
+                    if wid == self.current_selected_frame:
+                        old_index = i
+                        break
+
+                if old_index != -1:
+                    bg_color = "#FFFFFF" if old_index % 2 == 0 else "#E8E8E8"
+                    self.current_selected_frame.setStyleSheet(
+                        f"background-color: {bg_color}; color: black; border-bottom: 1px solid #AAA;")
+
+            except RuntimeError:
+                self.current_selected_frame = None
 
         selected_frame = self.lista_wizyt.itemWidget(item)
         if selected_frame:
@@ -269,10 +314,28 @@ class BaseWindow(QWidget):
         f.setStyleSheet("background-color: #666; border-bottom: 2px solid #444;")
         hl = QHBoxLayout(f)
         hl.setContentsMargins(10, 0, 10, 0)
-        for i, txt in enumerate(["DATA", "OPIS", col3_text]):
-            l = QLabel(txt)
-            l.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
-            hl.addWidget(l, stretch=1 if i == 1 else 0)
+
+        # Szerokości kolumn
+        WIDTH_DATE = 140
+        WIDTH_PERSON = 150
+
+        # Kolumna 1: DATA
+        l1 = QLabel("DATA")
+        l1.setFixedWidth(WIDTH_DATE)
+        l1.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        hl.addWidget(l1)
+
+        # Kolumna 2: OPIS (Stretch)
+        l2 = QLabel("OPIS")
+        l2.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        hl.addWidget(l2, stretch=1)
+
+        # Kolumna 3: OSOBA
+        l3 = QLabel(col3_text)
+        l3.setFixedWidth(WIDTH_PERSON)
+        l3.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        hl.addWidget(l3)
+
         f.setLayout(hl)
         return f
 
@@ -288,7 +351,6 @@ class BaseWindow(QWidget):
             print(f"DB Error: {e}")
             return None
 
-    # --- TO JEST FUNKCJA, KTÓREJ BRAKOWAŁO ---
     def setup_info_widget(self, title, subtitle):
         frame = QFrame(self)
         frame.setFixedHeight(80)

@@ -14,7 +14,13 @@ class AddLabTestWindow(QDialog):
         self.visit_id = visit_id
         self.setWindowTitle("Zleć Badanie")
         self.resize(400, 250)
-        self.setStyleSheet("background-color: #F0F0F0;")
+
+        # WYMUSZENIE CZARNEGO TEKSTU DLA CAŁEGO OKNA
+        self.setStyleSheet("""
+            QDialog { background-color: #F0F0F0; }
+            QLabel { color: black; }
+            QLineEdit { color: black; background-color: white; border: 1px solid #AAA; padding: 5px; }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -24,11 +30,10 @@ class AddLabTestWindow(QDialog):
 
         self.title_in = QLineEdit()
         self.title_in.setPlaceholderText("Wpisz nazwę badania...")
-        self.title_in.setStyleSheet("background-color: white; border: 1px solid #AAA; padding: 5px;")
         layout.addWidget(self.title_in)
 
         info_lbl = QLabel("Opis/Wyniki zostaną uzupełnione przez Laboranta.")
-        info_lbl.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        info_lbl.setStyleSheet("color: #555; font-style: italic; font-size: 11px;")
         layout.addWidget(info_lbl)
 
         layout.addStretch()
@@ -68,12 +73,20 @@ class AddVisitWindow(QDialog):
         self.doctor_id = doctor_id
         self.setWindowTitle("Dodaj Nową Wizytę")
         self.resize(400, 400)
-        self.setStyleSheet("background-color: #F0F0F0;")
+
+        # WYMUSZENIE CZARNEGO TEKSTU DLA CAŁEGO OKNA
+        self.setStyleSheet("""
+            QDialog { background-color: #F0F0F0; }
+            QLabel { color: black; font-size: 13px; font-weight: bold; }
+            QLineEdit { color: black; background-color: white; border: 1px solid #AAA; padding: 5px; }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
-        layout.addWidget(QLabel("<h2>Nowa Wizyta</h2>"))
+        header = QLabel("<h2>Nowa Wizyta</h2>")
+        header.setStyleSheet("color: black; border: none;")
+        layout.addWidget(header)
 
         self.date_in = QLineEdit()
         self.date_in.setPlaceholderText("YYYY-MM-DD HH:MM")
@@ -85,14 +98,15 @@ class AddVisitWindow(QDialog):
         self.pesel_in = QLineEdit()
         self.pesel_in.setPlaceholderText("PESEL Pacjenta")
 
-        style_input = "background-color: white; border: 1px solid #AAA; padding: 5px;"
-        self.date_in.setStyleSheet(style_input)
-        self.title_in.setStyleSheet(style_input)
-        self.pesel_in.setStyleSheet(style_input)
+        # Dodawanie pól do layoutu
+        layout.addWidget(QLabel("Data:"))
+        layout.addWidget(self.date_in)
 
-        for lbl, widget in [("Data:", self.date_in), ("Tytuł:", self.title_in), ("Pacjent (PESEL):", self.pesel_in)]:
-            layout.addWidget(QLabel(lbl))
-            layout.addWidget(widget)
+        layout.addWidget(QLabel("Tytuł:"))
+        layout.addWidget(self.title_in)
+
+        layout.addWidget(QLabel("Pacjent (PESEL):"))
+        layout.addWidget(self.pesel_in)
 
         layout.addStretch()
 
@@ -140,18 +154,18 @@ class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Lekarz")
         self.code_input = None
-        self.init_ui()  # To wywołuje setup_sidebar_widgets
+        self.init_ui()
 
-    # Ta metoda musi istnieć, aby BaseWindow nie zgłaszał błędu
     def setup_sidebar_widgets(self):
-        # Info o lekarzu
         self.setup_info_widget("PANEL LEKARZA", f"ID: {self.user_id}")
 
-        # Widget wyszukiwania (prostszy styl)
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
+        # Wymuszenie czarnego tekstu również w panelu bocznym
         search_frame.setStyleSheet("""
             QFrame { background-color: white; border: 2px solid #CCC; }
+            QLabel { color: #333; }
+            QLineEdit { color: black; background-color: white; border: 1px solid #AAA; }
         """)
 
         layout = QVBoxLayout(search_frame)
@@ -165,7 +179,6 @@ class DoctorWindow(BaseWindow):
         self.code_input = QLineEdit(search_frame)
         self.code_input.setPlaceholderText("Kod (6 cyfr)")
         self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_input.setStyleSheet("border: 1px solid #AAA; padding: 5px; color: black;")
 
         search_btn = QPushButton("POBIERZ HISTORIĘ", search_frame)
         search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -208,7 +221,6 @@ class DoctorWindow(BaseWindow):
         self.refresh_list()
 
     def get_sql_query(self):
-        # Pobieramy ID wizyty
         return "SELECT id, visit_date, title, pesel FROM visits WHERE doctor_id = %s"
 
     def load_patient_by_code(self):
@@ -241,7 +253,6 @@ class DoctorWindow(BaseWindow):
         except Exception as e:
             QMessageBox.critical(self, "Błąd", str(e))
 
-    # --- NADPISANIE FUNKCJI LISTY (ABY OBSŁUŻYĆ ID WIZYTY) ---
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 

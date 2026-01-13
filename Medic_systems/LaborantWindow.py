@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO WPISYWANIA WYNIKÓW ---
+# --- OKNO WPISYWANIA WYNIKÓW (Bez zmian - styl czarny tekst) ---
 class FillLabResultWindow(QDialog):
     def __init__(self, test_id, test_title, parent=None):
         super().__init__(parent)
@@ -16,7 +16,17 @@ class FillLabResultWindow(QDialog):
         self.resize(500, 400)
 
         # Stylizacja okna
-        self.setStyleSheet("background-color: #F0F2F5;")
+        self.setStyleSheet("""
+            QDialog { background-color: #F0F0F0; }
+            QLabel { color: black; font-size: 13px; }
+            QTextEdit { 
+                background-color: white; 
+                color: black; 
+                border: 1px solid #AAA; 
+                border-radius: 5px; 
+                padding: 10px;
+            }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -32,16 +42,6 @@ class FillLabResultWindow(QDialog):
 
         self.result_edit = QTextEdit()
         self.result_edit.setPlaceholderText("Wpisz tutaj szczegółowe wyniki badania...")
-        self.result_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: white; 
-                border: 1px solid #CCC; 
-                border-radius: 5px; 
-                padding: 10px;
-                font-size: 13px;
-                color: black;
-            }
-        """)
         layout.addWidget(self.result_edit)
 
         btn = QPushButton("ZAPISZ WYNIK")
@@ -54,6 +54,7 @@ class FillLabResultWindow(QDialog):
                 font-weight: bold; 
                 border-radius: 5px; 
                 font-size: 14px;
+                border: 1px solid #1F8ACF;
             }
             QPushButton:hover { background-color: #1F8ACF; }
         """)
@@ -88,105 +89,48 @@ class FillLabResultWindow(QDialog):
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Laborant")
-        self.code_input = None
-        # Ta metoda z BaseWindow wywoła setup_sidebar_widgets
+        # Automatyczne ładowanie nastąpi dzięki init_ui -> refresh_list -> get_sql_query
         self.init_ui()
 
-    # Ta metoda jest WYMAGANA przez BaseWindow
     def setup_sidebar_widgets(self):
-        # Info o laborancie (metoda z BaseWindow)
-        # Upewnij się, że masz najnowsze BaseWindow, jeśli tu wystąpi błąd
-        try:
-            self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
-        except AttributeError:
-            # Fallback jeśli masz starszą wersję BaseWindow
-            pass
+        self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
 
-        # --- SEKCJA WYSZUKIWANIA KODEM ---
-        search_frame = QFrame(self)
-        search_frame.setFixedHeight(150)
-        search_frame.setStyleSheet("""
-            QFrame { background-color: white; border-radius: 10px; border: 2px solid #CCC; }
+        # Usunąłem ramkę wyszukiwania kodem.
+        # Zamiast tego dodajemy informację statyczną.
+
+        info_frame = QFrame(self)
+        info_frame.setStyleSheet("""
+            QFrame { background-color: white; border: 2px solid #CCC; border-radius: 10px; }
+            QLabel { color: #333; }
         """)
-
-        layout = QVBoxLayout(search_frame)
+        layout = QVBoxLayout(info_frame)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(10)
-        layout.setContentsMargins(10, 10, 10, 10)
 
-        lbl = QLabel("DOSTĘP DO PACJENTA", search_frame)
-        lbl.setStyleSheet("color: #333; font-weight: bold; font-size: 11px; border: none;")
-
-        self.code_input = QLineEdit(search_frame)
-        self.code_input.setPlaceholderText("Kod (6 cyfr)")
-        self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_input.setStyleSheet("border: 1px solid #AAA; border-radius: 5px; padding: 5px; color: black;")
-
-        search_btn = QPushButton("SZUKAJ BADAŃ", search_frame)
-        search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        search_btn.setStyleSheet("""
-            QPushButton { background-color: #2F9ADF; color: white; font-weight: bold; border-radius: 5px; padding: 5px; border: none;}
-            QPushButton:hover { background-color: #1F8ACF; }
-        """)
-        search_btn.clicked.connect(self.load_patient_by_code)
+        lbl = QLabel("TRYB PRACY:\nWSZYSTKIE ZLECENIA", info_frame)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setStyleSheet("font-weight: bold; font-size: 12px; border: none;")
 
         layout.addWidget(lbl)
-        layout.addWidget(self.code_input)
-        layout.addWidget(search_btn)
+        self.side_layout.addWidget(info_frame)
 
-        self.side_layout.addWidget(search_frame)
-
-    # Ta metoda jest WYMAGANA przez BaseWindow
     def setup_extra_buttons(self):
+        # Przycisk do ręcznego odświeżania listy (np. gdy lekarz dodał coś przed chwilą)
+        self.add_button("ODŚWIEŻ LISTĘ").clicked.connect(self.refresh_list)
+
         # Przycisk do wpisywania wyników
         self.add_button("WPISZ WYNIKI").clicked.connect(self.open_fill_result)
 
     def get_sql_query(self):
-        # Domyślnie pusta lista (wymagamy kodu)
-        return ""
-
-    def load_patient_by_code(self):
-        code = self.code_input.text().strip()
-        if len(code) != 6:
-            QMessageBox.warning(self, "Błąd", "Kod musi mieć 6 cyfr.")
-            return
-
-        if not self.connection: return
-
-        try:
-            with self.connection.cursor() as cursor:
-                # 1. Weryfikacja kodu i pobranie PESEL
-                cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
-                               (code, datetime.now()))
-                res = cursor.fetchone()
-                if not res:
-                    QMessageBox.warning(self, "Błąd", "Kod nieprawidłowy lub wygasł.")
-                    return
-
-                pesel = res[0]
-
-                # 2. Pobranie BADAŃ (lab_tests) dla tego pacjenta
-                # Łączymy lab_tests z visits, aby sprawdzić PESEL
-                query = """
-                    SELECT t.id, v.visit_date, t.title, v.pesel 
-                    FROM lab_tests t
-                    JOIN visits v ON t.visit_id = v.id
-                    WHERE v.pesel = %s
-                    ORDER BY v.visit_date DESC
-                """
-                cursor.execute(query, (pesel,))
-                rows = cursor.fetchall()
-
-                self.lista_wizyt.clear()
-                self.add_list_items(rows)
-
-                if not rows:
-                    QMessageBox.information(self, "Info", "Ten pacjent nie ma zleconych żadnych badań.")
-                else:
-                    QMessageBox.information(self, "Sukces", f"Znaleziono {len(rows)} badań dla pacjenta: {pesel}")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Błąd", str(e))
+        # --- ZMIANA LOGIKI ---
+        # Pobieramy WSZYSTKIE badania, które nie mają opisu (description IS NULL lub pusty string)
+        # Niezależnie od pacjenta.
+        return """
+            SELECT t.id, v.visit_date, t.title, v.pesel 
+            FROM lab_tests t
+            JOIN visits v ON t.visit_id = v.id
+            WHERE t.description IS NULL OR t.description = ''
+            ORDER BY v.visit_date DESC
+        """
 
     def open_fill_result(self):
         if not self.current_selected_frame:
@@ -201,15 +145,14 @@ class LaborantWindow(BaseWindow):
             QMessageBox.critical(self, "Błąd", "Nie można zidentyfikować badania.")
             return
 
-        # Otwieramy okno edycji i po zamknięciu (jeśli sukces) nic nie robimy lub odświeżamy
+        # Otwieramy okno edycji
         if FillLabResultWindow(test_id, test_title, self).exec():
-            # Można odświeżyć listę, ale wymagałoby to ponownego wpisania kodu,
-            # więc na razie zostawiamy widok jak jest
-            pass
+            # Po pomyślnym zapisie odświeżamy listę -> wykonane badanie zniknie z listy "Do zrobienia"
+            self.refresh_list()
 
-    # --- NADPISANIE FUNKCJI LISTY (ABY OBSŁUŻYĆ ID BADANIA) ---
+    # --- NADPISANIE FUNKCJI LISTY (Styl czarny tekst, układ kolumn) ---
     def add_list_items(self, data_rows):
-        styles = ["background-color: #FFFFFF;", "background-color: #F0F0F0;"]
+        styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 
         # data_rows: (test_id, data_wizyty, tytul_badania, pesel)
         for i, (tid, data, tytul, pesel) in enumerate(data_rows):
@@ -223,7 +166,7 @@ class LaborantWindow(BaseWindow):
             frame = QFrame()
             frame.setFixedHeight(60)
             # Styl z czarnym tekstem
-            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #DDD; color: black;")
+            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #AAA; color: black;")
 
             # --- ZAPAMIĘTUJEMY ID BADANIA ---
             frame.setProperty("test_id", tid)
