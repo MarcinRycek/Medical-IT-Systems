@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO ZLECANIA BADANIA (Styl: Czarny tekst) ---
+# --- OKNO ZLECANIA BADANIA ---
 class AddLabTestWindow(QDialog):
     def __init__(self, visit_id, parent=None):
         super().__init__(parent)
@@ -65,7 +65,7 @@ class AddLabTestWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- OKNO DODAWANIA WIZYTY (Styl: Czarny tekst) ---
+# --- OKNO DODAWANIA WIZYTY (ZMIANA: NA KOD TYMCZASOWY) ---
 class AddVisitWindow(QDialog):
     def __init__(self, doctor_id, parent=None):
         super().__init__(parent)
@@ -93,8 +93,9 @@ class AddVisitWindow(QDialog):
         self.title_in = QLineEdit()
         self.title_in.setPlaceholderText("Np. Konsultacja")
 
-        self.pesel_in = QLineEdit()
-        self.pesel_in.setPlaceholderText("PESEL Pacjenta")
+        # ZMIANA: Zamiast PESEL, prosimy o KOD
+        self.code_in = QLineEdit()
+        self.code_in.setPlaceholderText("KOD PACJENTA (6 cyfr)")
 
         layout.addWidget(QLabel("Data:"))
         layout.addWidget(self.date_in)
@@ -102,8 +103,8 @@ class AddVisitWindow(QDialog):
         layout.addWidget(QLabel("Tytuł:"))
         layout.addWidget(self.title_in)
 
-        layout.addWidget(QLabel("Pacjent (PESEL):"))
-        layout.addWidget(self.pesel_in)
+        layout.addWidget(QLabel("Kod autoryzacji pacjenta:"))
+        layout.addWidget(self.code_in)
 
         layout.addStretch()
 
@@ -117,14 +118,15 @@ class AddVisitWindow(QDialog):
     def save(self):
         date_text = self.date_in.text().strip()
         title = self.title_in.text().strip()
-        pesel = self.pesel_in.text().strip()
+        code = self.code_in.text().strip()  # Pobieramy kod
 
-        if not date_text or not title or not pesel:
+        if not date_text or not title or not code:
             QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola.")
             return
 
-        if len(pesel) != 11 or not pesel.isdigit():
-            QMessageBox.warning(self, "Błąd", "PESEL musi mieć 11 cyfr.")
+        # Walidacja kodu (6 cyfr)
+        if len(code) != 6 or not code.isdigit():
+            QMessageBox.warning(self, "Błąd", "Kod pacjenta musi składać się z 6 cyfr.")
             return
 
         try:
@@ -136,14 +138,33 @@ class AddVisitWindow(QDialog):
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
+
+            # 1. Najpierw zamieniamy KOD na PESEL (sprawdzając czy kod jest ważny)
+            cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
+                           (code, datetime.now()))
+            res = cursor.fetchone()
+
+            if not res:
+                conn.close()
+                QMessageBox.warning(self, "Błąd",
+                                    "Podany kod jest nieprawidłowy lub wygasł!\nPoproś pacjenta o wygenerowanie nowego kodu.")
+                return
+
+            # Mamy PESEL pacjenta!
+            pesel = res[0]
+
+            # 2. Teraz dodajemy wizytę używając znalezionego numeru PESEL
             cursor.execute("INSERT INTO visits (visit_date, title, pesel, doctor_id) VALUES (%s, %s, %s, %s)",
                            (valid_date, title, pesel, self.doctor_id))
+
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sukces", "Wizyta dodana.")
+
+            QMessageBox.information(self, "Sukces", f"Dodano wizytę dla pacjenta (PESEL: {pesel}).")
             self.accept()
+
         except Exception as e:
-            QMessageBox.critical(self, "Błąd", str(e))
+            QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
 # --- GŁÓWNE OKNO LEKARZA ---
@@ -154,11 +175,10 @@ class DoctorWindow(BaseWindow):
         self.init_ui()
 
     def setup_sidebar_widgets(self):
-        self.setup_info_widget("PANEL LEKARZA", f"ID: {self.user_id}")
+        self.setup_info_widget("PANEL LEKARZA", f"Numer uprawnienia: {self.user_id}")
 
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
-        # Stylizacja panelu bocznego
         search_frame.setStyleSheet("""
             QFrame { background-color: white; border: 2px solid #CCC; }
             QLabel { color: #333; }
@@ -192,15 +212,11 @@ class DoctorWindow(BaseWindow):
         self.side_layout.addWidget(search_frame)
 
     def setup_extra_buttons(self):
-        # Usunięto przycisk "Mój Harmonogram" - lekarz widzi tylko po wpisaniu kodu
         self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
         self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 
     def open_add_visit(self):
-        # Dodawanie wizyty (może być dla nowego pacjenta, nie wpływa na widok listy)
         if AddVisitWindow(self.user_id, self).exec():
-            # Po dodaniu NIE odświeżamy listy automatycznie na "wszystkie",
-            # chyba że chcemy załadować tego konkretnego pacjenta, ale tu zostawiamy puste dla bezpieczeństwa.
             pass
 
     def open_add_lab_test(self):
@@ -217,8 +233,6 @@ class DoctorWindow(BaseWindow):
         AddLabTestWindow(visit_id, self).exec()
 
     def get_sql_query(self):
-        # --- ZMIANA: Zwracamy pusty string ---
-        # Domyślnie lista ma być pusta. Lekarz nie widzi nic, dopóki nie wpisze kodu.
         return ""
 
     def load_patient_by_code(self):
@@ -231,7 +245,6 @@ class DoctorWindow(BaseWindow):
 
         try:
             with self.connection.cursor() as cursor:
-                # 1. Sprawdzamy kod
                 cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
                                (code, datetime.now()))
                 res = cursor.fetchone()
@@ -240,8 +253,6 @@ class DoctorWindow(BaseWindow):
                     return
 
                 pesel = res[0]
-
-                # 2. Pobieramy historię TEGO konkretnego pacjenta
                 cursor.execute(
                     "SELECT id, visit_date, title, doctor_id FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
                     (pesel,))
@@ -254,7 +265,6 @@ class DoctorWindow(BaseWindow):
         except Exception as e:
             QMessageBox.critical(self, "Błąd", str(e))
 
-    # --- NADPISANIE FUNKCJI LISTY ---
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 
@@ -269,7 +279,6 @@ class DoctorWindow(BaseWindow):
             frame.setFixedHeight(60)
             frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #AAA; color: black;")
 
-            # Zapamiętujemy ID wizyty
             frame.setProperty("visit_id", vid)
 
             hl = QHBoxLayout(frame)
