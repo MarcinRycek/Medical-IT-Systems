@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
 
-# --- OKNO ZLECANIA BADANIA ---
+# --- OKNO ZLECANIA BADANIA (Styl: Czarny tekst) ---
 class AddLabTestWindow(QDialog):
     def __init__(self, visit_id, parent=None):
         super().__init__(parent)
@@ -15,7 +15,6 @@ class AddLabTestWindow(QDialog):
         self.setWindowTitle("Zleć Badanie")
         self.resize(400, 250)
 
-        # WYMUSZENIE CZARNEGO TEKSTU DLA CAŁEGO OKNA
         self.setStyleSheet("""
             QDialog { background-color: #F0F0F0; }
             QLabel { color: black; }
@@ -66,7 +65,7 @@ class AddLabTestWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- OKNO DODAWANIA WIZYTY ---
+# --- OKNO DODAWANIA WIZYTY (Styl: Czarny tekst) ---
 class AddVisitWindow(QDialog):
     def __init__(self, doctor_id, parent=None):
         super().__init__(parent)
@@ -74,7 +73,6 @@ class AddVisitWindow(QDialog):
         self.setWindowTitle("Dodaj Nową Wizytę")
         self.resize(400, 400)
 
-        # WYMUSZENIE CZARNEGO TEKSTU DLA CAŁEGO OKNA
         self.setStyleSheet("""
             QDialog { background-color: #F0F0F0; }
             QLabel { color: black; font-size: 13px; font-weight: bold; }
@@ -98,7 +96,6 @@ class AddVisitWindow(QDialog):
         self.pesel_in = QLineEdit()
         self.pesel_in.setPlaceholderText("PESEL Pacjenta")
 
-        # Dodawanie pól do layoutu
         layout.addWidget(QLabel("Data:"))
         layout.addWidget(self.date_in)
 
@@ -161,7 +158,7 @@ class DoctorWindow(BaseWindow):
 
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
-        # Wymuszenie czarnego tekstu również w panelu bocznym
+        # Stylizacja panelu bocznego
         search_frame.setStyleSheet("""
             QFrame { background-color: white; border: 2px solid #CCC; }
             QLabel { color: #333; }
@@ -195,17 +192,20 @@ class DoctorWindow(BaseWindow):
         self.side_layout.addWidget(search_frame)
 
     def setup_extra_buttons(self):
-        self.add_button("MÓJ HARMONOGRAM").clicked.connect(self.reset_to_my_schedule)
+        # Usunięto przycisk "Mój Harmonogram" - lekarz widzi tylko po wpisaniu kodu
         self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
         self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 
     def open_add_visit(self):
+        # Dodawanie wizyty (może być dla nowego pacjenta, nie wpływa na widok listy)
         if AddVisitWindow(self.user_id, self).exec():
-            self.refresh_list()
+            # Po dodaniu NIE odświeżamy listy automatycznie na "wszystkie",
+            # chyba że chcemy załadować tego konkretnego pacjenta, ale tu zostawiamy puste dla bezpieczeństwa.
+            pass
 
     def open_add_lab_test(self):
         if not self.current_selected_frame:
-            QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy, do której chcesz zlecić badanie.")
+            QMessageBox.warning(self, "Uwaga", "Najpierw wyszukaj pacjenta i wybierz wizytę z listy.")
             return
 
         visit_id = self.current_selected_frame.property("visit_id")
@@ -216,12 +216,10 @@ class DoctorWindow(BaseWindow):
 
         AddLabTestWindow(visit_id, self).exec()
 
-    def reset_to_my_schedule(self):
-        self.lista_wizyt.clear()
-        self.refresh_list()
-
     def get_sql_query(self):
-        return "SELECT id, visit_date, title, pesel FROM visits WHERE doctor_id = %s"
+        # --- ZMIANA: Zwracamy pusty string ---
+        # Domyślnie lista ma być pusta. Lekarz nie widzi nic, dopóki nie wpisze kodu.
+        return ""
 
     def load_patient_by_code(self):
         code = self.code_input.text().strip()
@@ -233,6 +231,7 @@ class DoctorWindow(BaseWindow):
 
         try:
             with self.connection.cursor() as cursor:
+                # 1. Sprawdzamy kod
                 cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
                                (code, datetime.now()))
                 res = cursor.fetchone()
@@ -241,6 +240,8 @@ class DoctorWindow(BaseWindow):
                     return
 
                 pesel = res[0]
+
+                # 2. Pobieramy historię TEGO konkretnego pacjenta
                 cursor.execute(
                     "SELECT id, visit_date, title, doctor_id FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
                     (pesel,))
@@ -249,10 +250,11 @@ class DoctorWindow(BaseWindow):
                 self.lista_wizyt.clear()
                 self.add_list_items(rows)
 
-                QMessageBox.information(self, "Sukces", f"Wczytano pacjenta: {pesel}")
+                QMessageBox.information(self, "Sukces", f"Załadowano kartę pacjenta: {pesel}")
         except Exception as e:
             QMessageBox.critical(self, "Błąd", str(e))
 
+    # --- NADPISANIE FUNKCJI LISTY ---
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
 

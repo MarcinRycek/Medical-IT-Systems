@@ -95,23 +95,11 @@ class LaborantWindow(BaseWindow):
     def setup_sidebar_widgets(self):
         self.setup_info_widget("PANEL LABORANTA", f"ID: {self.user_id}")
 
-        # Usunąłem ramkę wyszukiwania kodem.
-        # Zamiast tego dodajemy informację statyczną.
 
-        info_frame = QFrame(self)
-        info_frame.setStyleSheet("""
-            QFrame { background-color: white; border: 2px solid #CCC; border-radius: 10px; }
-            QLabel { color: #333; }
-        """)
-        layout = QVBoxLayout(info_frame)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        lbl = QLabel("TRYB PRACY:\nWSZYSTKIE ZLECENIA", info_frame)
-        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setStyleSheet("font-weight: bold; font-size: 12px; border: none;")
 
-        layout.addWidget(lbl)
-        self.side_layout.addWidget(info_frame)
+
+
 
     def setup_extra_buttons(self):
         # Przycisk do ręcznego odświeżania listy (np. gdy lekarz dodał coś przed chwilą)
