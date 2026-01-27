@@ -1,50 +1,62 @@
 import psycopg2
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
                                QPushButton, QListWidget, QListWidgetItem,
-                               QDialog, QMessageBox, QScrollArea)
+                               QDialog, QMessageBox, QScrollArea, QTextEdit)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
 
-# Wspólny styl dla komunikatów
-MSG_BOX_STYLE = """
-    QMessageBox {
-        background-color: #FFFFFF;
-        color: #000000;
+# --- GLÓWNY STYL DLA WSZYSTKICH OKIEN DIALOGOWYCH ---
+# Eksportujemy go, aby DoctorWindow i inne mogły go używać
+DIALOG_STYLE = """
+    QDialog { background-color: #F8F9FA; }
+
+    QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
+
+    QLineEdit, QTextEdit { 
+        background-color: white; 
+        color: #2C3E50; 
+        border: 1px solid #BDC3C7; 
+        border-radius: 4px; 
+        padding: 8px; 
+        font-size: 13px; 
     }
-    QMessageBox QLabel {
-        color: #000000;
-        background-color: transparent;
+    QLineEdit:focus, QTextEdit:focus { border: 2px solid #3498DB; }
+
+    /* Styl komunikatów (QMessageBox) */
+    QMessageBox { background-color: #FFFFFF; color: #000000; }
+    QMessageBox QLabel { color: #000000; background-color: transparent; }
+    QMessageBox QPushButton { 
+        background-color: #F0F0F0; 
+        color: #000000; 
+        border: 1px solid #888888; 
+        border-radius: 5px; 
+        padding: 5px 15px; 
     }
-    QMessageBox QPushButton {
-        background-color: #F0F0F0;
-        color: #000000;
-        border: 1px solid #888888;
-        border-radius: 5px;
-        padding: 5px 15px;
-    }
-    QMessageBox QPushButton:hover {
-        background-color: #E0E0E0;
-    }
+    QMessageBox QPushButton:hover { background-color: #E0E0E0; }
 """
 
 
+# --- OKNO SZCZEGÓŁÓW (Wspólne dla wszystkich) ---
 class VisitDetailsWindow(QDialog):
-    def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, parent=None):
+    def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, recommendations=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Karta Wizyty")
-        self.resize(550, 600)
-        self.setStyleSheet("background-color: #F8F9FA;" + MSG_BOX_STYLE)
+        self.resize(550, 700)
+        # Używamy zdefiniowanego wyżej stylu
+        self.setStyleSheet(DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
 
+        # Tytuł
         title_lbl = QLabel(f"{tytul_wizyty}", self)
         title_lbl.setStyleSheet("color: #2C3E50; font-size: 22px; font-weight: bold; border: none;")
         layout.addWidget(title_lbl)
 
+        # Ramka z informacjami
         info_frame = QFrame()
         info_frame.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 8px;")
         info_layout = QVBoxLayout(info_frame)
@@ -53,18 +65,36 @@ class VisitDetailsWindow(QDialog):
         lbl_date.setStyleSheet("color: #555; font-size: 13px; border: none; font-weight: bold;")
         info_layout.addWidget(lbl_date)
         info_layout.addSpacing(5)
-        lbl_doc = QLabel(f"PROWADZĄCY:\n{lekarz}")
+        lbl_doc = QLabel(f"PROWADZĄCY / PACJENT:\n{lekarz}")
         lbl_doc.setStyleSheet("color: #555; font-size: 13px; border: none; font-weight: bold;")
         info_layout.addWidget(lbl_doc)
         layout.addWidget(info_frame)
 
-        if lab_results:
-            layout.addSpacing(20)
-            header_lbl = QLabel("WYNIKI BADAŃ")
-            header_lbl.setStyleSheet(
-                "color: #34495E; font-size: 14px; font-weight: bold; border: none; border-bottom: 2px solid #3498DB; padding-bottom: 5px;")
-            layout.addWidget(header_lbl)
+        # --- ZALECENIA LEKARSKIE ---
+        layout.addSpacing(10)
+        rec_lbl = QLabel("ZALECENIA LEKARSKIE")
+        rec_lbl.setStyleSheet(
+            "color: #27AE60; font-size: 14px; font-weight: bold; border-bottom: 2px solid #27AE60; padding-bottom: 5px;")
+        layout.addWidget(rec_lbl)
 
+        rec_text = QTextEdit()
+        rec_text.setReadOnly(True)
+        if recommendations:
+            rec_text.setText(recommendations)
+        else:
+            rec_text.setPlaceholderText("Brak wpisanych zaleceń.")
+
+        rec_text.setFixedHeight(100)
+        layout.addWidget(rec_text)
+
+        # --- WYNIKI BADAŃ ---
+        layout.addSpacing(10)
+        header_lbl = QLabel("WYNIKI BADAŃ")
+        header_lbl.setStyleSheet(
+            "color: #34495E; font-size: 14px; font-weight: bold; border-bottom: 2px solid #3498DB; padding-bottom: 5px;")
+        layout.addWidget(header_lbl)
+
+        if lab_results:
             results_area = QScrollArea()
             results_area.setWidgetResizable(True)
             results_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -96,10 +126,9 @@ class VisitDetailsWindow(QDialog):
             results_area.setWidget(results_content)
             layout.addWidget(results_area)
         else:
-            layout.addStretch()
             layout.addWidget(QLabel("Brak zleconych badań.", alignment=Qt.AlignmentFlag.AlignCenter))
-            layout.addStretch()
 
+        # Zamknij
         close_button = QPushButton("ZAMKNIJ", self)
         close_button.setStyleSheet(
             "QPushButton { background-color: #ECF0F1; color: #2C3E50; border: 1px solid #BDC3C7; padding: 10px 20px; border-radius: 5px; font-weight: bold; } QPushButton:hover { background-color: #D5D8DC; }")
@@ -112,7 +141,7 @@ class LogoutWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Wylogowanie")
         self.resize(350, 180)
-        self.setStyleSheet("background-color: white;" + MSG_BOX_STYLE)
+        self.setStyleSheet(DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -159,8 +188,8 @@ class BaseWindow(QWidget):
         self.setWindowTitle(f"MedEX-POL - Panel: {self.role_title}")
         self.resize(1200, 800)
 
-        # --- APLIKUJEMY STYL KOMUNIKATÓW NA CAŁE OKNO ---
-        self.setStyleSheet(MSG_BOX_STYLE)
+        # Aplikujemy styl ogólny (naprawia tła komunikatów w głównym oknie)
+        self.setStyleSheet(DIALOG_STYLE)
 
         self.current_selected_frame = None
         self.current_selected_data = None
@@ -312,8 +341,42 @@ class BaseWindow(QWidget):
         if not self.current_selected_data:
             QMessageBox.warning(self, "Uwaga", "Wybierz wizytę z listy.")
             return
-        d, t, o = self.current_selected_data
-        VisitDetailsWindow(d, t, o, lab_results=None, parent=self).exec()
+
+        # --- ZABEZPIECZENIE PRZED RÓŻNĄ ILOŚCIĄ DANYCH ---
+        data = self.current_selected_data
+
+        # Pobieramy podstawowe 3 elementy (zawsze są)
+        d = data[0]
+        t = data[1]
+        o = data[2]
+
+        # Czwarty element (zalecenia) jest opcjonalny (może go nie być u laboranta)
+        recs = data[3] if len(data) > 3 else None
+
+        visit_id = self.current_selected_frame.property("visit_id") if self.current_selected_frame else None
+        lab_results = []
+
+        # Jeśli nie ma zaleceń w danych (np. Pacjent), spróbuj pobrać z bazy
+        if not recs and visit_id and self.connection:
+            try:
+                with self.connection.cursor() as cursor:
+                    cursor.execute("SELECT recommendations FROM visits WHERE id = %s", (visit_id,))
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        recs = row[0]
+            except:
+                pass
+
+        if visit_id and self.connection:
+            try:
+                with self.connection.cursor() as cursor:
+                    cursor.execute("SELECT title, description FROM lab_tests WHERE visit_id = %s", (visit_id,))
+                    lab_results = cursor.fetchall()
+            except Exception as e:
+                print(f"Błąd badań: {e}")
+
+        # Otwieramy okno
+        VisitDetailsWindow(d, t, o, lab_results=lab_results, recommendations=recs, parent=self).exec()
 
     def _show_logout_window(self):
         from LoginWindow import LoginWindow
