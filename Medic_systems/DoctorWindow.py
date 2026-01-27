@@ -1,15 +1,16 @@
 import psycopg2
 from datetime import datetime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QMessageBox, QFrame,
+                               QPushButton, QMessageBox, QFrame, QTextEdit,
                                QListWidgetItem, QHBoxLayout)
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str
 
+# --- STYLE ---
 DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }
     QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
-    QLineEdit { 
+    QLineEdit, QTextEdit { 
         background-color: white; 
         border: 1px solid #BDC3C7; 
         border-radius: 4px;
@@ -17,7 +18,11 @@ DIALOG_STYLE = """
         color: #2C3E50;
         font-size: 13px;
     }
-    QLineEdit:focus { border: 2px solid #3498DB; }
+    QLineEdit:focus, QTextEdit:focus { border: 2px solid #3498DB; }
+
+    /* Styl dla komunikatów */
+    QMessageBox { background-color: white; color: black; }
+    QMessageBox QLabel { color: black; }
 """
 
 BTN_STYLE = """
@@ -33,6 +38,7 @@ BTN_STYLE = """
 """
 
 
+# --- OKNO ZLECANIA BADANIA (Bez zmian) ---
 class AddLabTestWindow(QDialog):
     def __init__(self, visit_id, parent=None):
         super().__init__(parent)
@@ -45,11 +51,9 @@ class AddLabTestWindow(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(25, 25, 25, 25)
 
-        header = QLabel("Nowe Zlecenie")
-        header.setStyleSheet("color: #2C3E50; font-size: 18px; border: none; margin-bottom: 10px;")
-        layout.addWidget(header)
+        layout.addWidget(QLabel("Nowe Zlecenie (Laboratorium)"))
 
-        layout.addWidget(QLabel("Nazwa badania (np. Morfologia, RTG):"))
+        layout.addWidget(QLabel("Nazwa badania (np. Morfologia):"))
         self.title_in = QLineEdit()
         self.title_in.setPlaceholderText("Wpisz nazwę badania...")
         layout.addWidget(self.title_in)
@@ -86,92 +90,69 @@ class AddLabTestWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-class AddVisitWindow(QDialog):
-    def __init__(self, doctor_id, parent=None):
+# --- NOWE OKNO: DODAWANIE ZALECEŃ LEKARSKICH ---
+class AddRecommendationWindow(QDialog):
+    def __init__(self, visit_id, current_recs, parent=None):
         super().__init__(parent)
-        self.doctor_id = doctor_id
-        self.setWindowTitle("Dodaj Nową Wizytę")
-        self.resize(400, 450)
+        self.visit_id = visit_id
+        self.setWindowTitle("Zalecenia Lekarskie")
+        self.resize(500, 450)
         self.setStyleSheet(DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
+        layout.setSpacing(15)
         layout.setContentsMargins(25, 25, 25, 25)
 
-        header = QLabel("Rejestracja Wizyty")
-        header.setStyleSheet("color: #2C3E50; font-size: 18px; border: none; margin-bottom: 10px;")
+        header = QLabel("Zalecenia i Przebieg Wizyty")
+        header.setStyleSheet("color: #2C3E50; font-size: 18px; border: none;")
         layout.addWidget(header)
 
-        self.date_in = QLineEdit()
-        self.date_in.setPlaceholderText("YYYY-MM-DD HH:MM")
-        self.date_in.setText(datetime.now().strftime("%Y-%m-%d %H:%M"))
+        layout.addWidget(QLabel("Treść zaleceń (Leki, diagnoza, uwagi):"))
+        self.rec_edit = QTextEdit()
+        # Jeśli są już jakieś zalecenia, wczytaj je
+        if current_recs:
+            self.rec_edit.setText(current_recs)
+        else:
+            self.rec_edit.setPlaceholderText("Wpisz diagnozę i zalecenia dla pacjenta...")
 
-        self.title_in = QLineEdit()
-        self.title_in.setPlaceholderText("Np. Konsultacja, Szczepienie")
+        layout.addWidget(self.rec_edit)
 
-        self.code_in = QLineEdit()
-        self.code_in.setPlaceholderText("6 cyfr od pacjenta")
-
-        layout.addWidget(QLabel("Data Wizyty:"))
-        layout.addWidget(self.date_in)
-
-        layout.addWidget(QLabel("Cel Wizyty / Tytuł:"))
-        layout.addWidget(self.title_in)
-
-        layout.addWidget(QLabel("Kod Autoryzacji Pacjenta:"))
-        layout.addWidget(self.code_in)
-
-        layout.addStretch()
-
-        btn = QPushButton("ZATWIERDŹ")
+        btn = QPushButton("ZAPISZ ZALECENIA")
         btn.setFixedHeight(45)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet(BTN_STYLE)
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27AE60; 
+                color: white; 
+                font-weight: bold; 
+                border-radius: 5px; 
+                font-size: 14px; 
+                border: none;
+            }
+            QPushButton:hover { background-color: #2ECC71; }
+        """)
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
     def save(self):
-        date_text = self.date_in.text().strip()
-        title = self.title_in.text().strip()
-        code = self.code_in.text().strip()
-
-        if not date_text or not title or not code:
-            QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola.")
-            return
-        if len(code) != 6 or not code.isdigit():
-            QMessageBox.warning(self, "Błąd", "Kod pacjenta musi składać się z 6 cyfr.")
-            return
-
-        try:
-            valid_date = datetime.strptime(date_text, "%Y-%m-%d %H:%M")
-        except ValueError:
-            QMessageBox.warning(self, "Błąd", "Zły format daty. Wymagany: RRRR-MM-DD GG:MM")
-            return
+        text = self.rec_edit.toPlainText().strip()
+        # Pozwalamy zapisać pusty tekst (jeśli lekarz chce wyczyścić zalecenia)
 
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
-
-            cursor.execute("SELECT pesel FROM patient_codes WHERE code = %s AND expiration_time > %s",
-                           (code, datetime.now()))
-            res = cursor.fetchone()
-
-            if not res:
-                conn.close()
-                QMessageBox.warning(self, "Błąd", "Kod nieprawidłowy lub wygasł.")
-                return
-
-            pesel = res[0]
-            cursor.execute("INSERT INTO visits (visit_date, title, pesel, doctor_id) VALUES (%s, %s, %s, %s)",
-                           (valid_date, title, pesel, self.doctor_id))
+            # Aktualizujemy tabelę visits
+            cursor.execute("UPDATE visits SET recommendations = %s WHERE id = %s",
+                           (text, self.visit_id))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sukces", f"Dodano wizytę dla pacjenta (PESEL: {pesel}).")
+            QMessageBox.information(self, "Sukces", "Zalecenia zostały zapisane w karcie wizyty.")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
+# --- GŁÓWNE OKNO LEKARZA ---
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Lekarz")
@@ -220,81 +201,93 @@ class DoctorWindow(BaseWindow):
 
     def setup_extra_buttons(self):
         self.add_button("MOJE WIZYTY").clicked.connect(self.reset_to_my_schedule)
-        self.add_button("DODAJ WIZYTĘ").clicked.connect(self.open_add_visit)
+
+        # --- ZMIANA: PRZYCISK DODAWANIA ZALECEŃ ZAMIAST WIZYT ---
+        self.add_button("DODAJ ZALECENIA").clicked.connect(self.open_add_recommendations)
         self.add_button("ZLEĆ BADANIE").clicked.connect(self.open_add_lab_test)
 
     def reset_to_my_schedule(self):
         self.refresh_list()
 
-    def refresh_list(self):
-        # Nadpisujemy refresh_list, aby przekazać 2 parametry: ID i DATĘ
-        self.current_selected_frame = None
-        self.current_selected_data = None
-        self.lista_wizyt.clear()
-
-        # Zapytanie korzystające z %s i %s
-        query = """
-            SELECT id, visit_date, title, pesel 
+    def get_sql_query(self):
+        # Pobieramy też kolumnę 'recommendations' (jako 5 element, choć add_list_items używa 4)
+        # Ale dla bezpieczeństwa trzymamy 4 w select, a recommendations pobierzemy osobno w razie potrzeby
+        # lub dołączymy tutaj.
+        # W tej wersji pobieramy recommendations, żeby mieć je w `current_selected_data`
+        return """
+            SELECT id, visit_date, title, pesel, recommendations
             FROM visits 
-            WHERE doctor_id = %s AND visit_date >= %s
+            WHERE doctor_id = %s AND visit_date >= NOW()
             ORDER BY visit_date ASC
         """
-
-        if not self.connection: return
-        try:
-            with self.connection.cursor() as cursor:
-                # DEBUG: Sprawdź w konsoli, jakie ID jest używane
-                print(f"DEBUG: Pobieranie wizyt dla Lekarza ID: {self.user_id}, od daty: {datetime.now()}")
-
-                # Przekazujemy ID lekarza i aktualny czas z Pythona
-                cursor.execute(query, (self.user_id, datetime.now()))
-                rows = cursor.fetchall()
-                self.add_list_items(rows)
-
-                if not rows:
-                    print("DEBUG: Brak wizyt spełniających kryteria.")
-
-        except Exception as e:
-            print(f"SQL Error: {e}")
 
     def add_list_items(self, data_rows):
         styles = ["background-color: #FFFFFF;", "background-color: #F8F9F9;"]
         WIDTH_DATE = 140
         WIDTH_PERSON = 150
 
-        for i, (vid, data, tytul, pesel) in enumerate(data_rows):
+        # Teraz data_rows może mieć 5 kolumn (id, date, title, pesel, recommendations)
+        for i, row in enumerate(data_rows):
+            vid = row[0]
+            data = row[1]
+            tytul = row[2]
+            pesel = row[3]
+            # row[4] to zalecenia, jeśli istnieją
+            recs = row[4] if len(row) > 4 else ""
+
             data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
             list_item = QListWidgetItem()
-            list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, str(pesel)))
+
+            # Zapisujemy dane (w tym zalecenia) w obiekcie
+            list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, str(pesel), recs))
 
             frame = QFrame()
             frame.setFixedHeight(65)
             frame.setStyleSheet(f"{styles[i % 2]} border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
+
             frame.setProperty("visit_id", vid)
 
             hl = QHBoxLayout(frame)
             hl.setContentsMargins(15, 0, 15, 0)
 
-            l1 = QLabel(data_str)
-            l1.setFixedWidth(WIDTH_DATE)
-            l1.setStyleSheet("border: none; color: #555; font-weight: bold;")
-            hl.addWidget(l1)
+            lbl_date = QLabel(data_str)
+            lbl_date.setFixedWidth(WIDTH_DATE)
+            lbl_date.setStyleSheet("border: none; color: #555; font-weight: bold;")
+            hl.addWidget(lbl_date)
 
-            l2 = QLabel(tytul)
-            l2.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
-            hl.addWidget(l2, stretch=1)
+            lbl_title = QLabel(tytul)
+            lbl_title.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
+            hl.addWidget(lbl_title, stretch=1)
 
-            l3 = QLabel(str(pesel))
-            l3.setFixedWidth(WIDTH_PERSON)
-            l3.setStyleSheet("border: none; color: #555;")
-            hl.addWidget(l3)
+            lbl_person = QLabel(str(pesel))
+            lbl_person.setFixedWidth(WIDTH_PERSON)
+            lbl_person.setStyleSheet("border: none; color: #555;")
+            hl.addWidget(lbl_person)
 
             self.lista_wizyt.addItem(list_item)
             list_item.setSizeHint(QSize(0, 65))
             self.lista_wizyt.setItemWidget(list_item, frame)
 
-    def open_add_visit(self):
-        if AddVisitWindow(self.user_id, self).exec():
+    # --- NOWA FUNKCJA OTWIERAJĄCA OKNO ZALECEŃ ---
+    def open_add_recommendations(self):
+        if not self.current_selected_frame:
+            QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy.")
+            return
+
+        visit_id = self.current_selected_frame.property("visit_id")
+
+        # Pobieramy aktualne zalecenia z danych elementu listy (zapisaliśmy je tam w add_list_items)
+        data = self.current_selected_data
+        # data to krotka: (data_str, tytul, pesel, recs)
+        current_recs = data[3] if data and len(data) > 3 else ""
+
+        if not visit_id:
+            QMessageBox.critical(self, "Błąd", "Brak ID wizyty.")
+            return
+
+        # Otwieramy okno
+        if AddRecommendationWindow(visit_id, current_recs, self).exec():
+            # Po zapisaniu odświeżamy listę, żeby zaktualizować dane
             self.refresh_list()
 
     def open_add_lab_test(self):
@@ -303,9 +296,7 @@ class DoctorWindow(BaseWindow):
             return
 
         visit_id = self.current_selected_frame.property("visit_id")
-
         if not visit_id:
-            QMessageBox.critical(self, "Błąd", "Nie udało się pobrać ID wizyty.")
             return
 
         AddLabTestWindow(visit_id, self).exec()
@@ -328,8 +319,9 @@ class DoctorWindow(BaseWindow):
                     return
 
                 pesel = res[0]
+                # Pobieramy też zalecenia (recommendations)
                 cursor.execute(
-                    "SELECT id, visit_date, title, pesel FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
+                    "SELECT id, visit_date, title, pesel, recommendations FROM visits WHERE pesel = %s ORDER BY visit_date DESC",
                     (pesel,))
                 rows = cursor.fetchall()
 
