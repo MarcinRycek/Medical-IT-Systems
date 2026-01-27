@@ -6,6 +6,25 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
+# --- STYLE LOKALNE ---
+LOCAL_DIALOG_STYLE = """
+    QDialog { background-color: #F8F9FA; }
+    QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
+    QLineEdit, QTextEdit { 
+        background-color: white; 
+        border: 1px solid #BDC3C7; 
+        border-radius: 4px; 
+        padding: 8px; 
+        color: #2C3E50;
+        font-size: 13px;
+    }
+    QLineEdit:focus, QTextEdit:focus { border: 2px solid #3498DB; }
+
+    QMessageBox { background-color: white; color: black; }
+    QMessageBox QLabel { color: black; }
+    QMessageBox QPushButton { background-color: #F0F0F0; color: black; border: 1px solid #888; }
+"""
+
 
 # --- OKNO ZLECANIA BADANIA ---
 class AddLabTestWindow(QDialog):
@@ -14,7 +33,7 @@ class AddLabTestWindow(QDialog):
         self.visit_id = visit_id
         self.setWindowTitle("Zleć Badanie")
         self.resize(400, 280)
-        self.setStyleSheet(DIALOG_STYLE)
+        self.setStyleSheet(LOCAL_DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -65,7 +84,7 @@ class AddRecommendationWindow(QDialog):
         self.visit_id = visit_id
         self.setWindowTitle("Zalecenia Lekarskie")
         self.resize(500, 450)
-        self.setStyleSheet(DIALOG_STYLE)
+        self.setStyleSheet(LOCAL_DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -111,13 +130,14 @@ class AddRecommendationWindow(QDialog):
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
         # 1. Inicjalizacja bazy i okna (BaseWindow)
+        # UWAGA: To wywoła refresh_list w klasie bazowej, ale my to zignorujemy
         super().__init__(user_id, "Lekarz")
         self.code_input = None
 
-        # 2. Budowa interfejsu (Twoje 3 tabele)
+        # 2. Przebudowa interfejsu (Usunięcie starej tabeli, dodanie 3 nowych)
         self.setup_doctor_ui()
 
-        # 3. Ręczne odświeżenie danych
+        # 3. Ręczne odświeżenie danych (Teraz UI jest gotowe)
         self.refresh_list()
 
     def get_doctor_login(self):
@@ -134,31 +154,43 @@ class DoctorWindow(BaseWindow):
     def setup_doctor_ui(self):
         """Konfiguruje 3 sekcje i usuwa domyślną listę z BaseWindow."""
 
-        # --- CZYSZCZENIE LAYOUTU (Usuwamy pustą tabelę z BaseWindow) ---
+        # --- KROK 1: USUWANIE ELEMENTÓW Z BASE WINDOW ---
+        # To usuwa tę pustą tabelę na dole!
+        if hasattr(self, 'lista_wizyt'):
+            self.lista_wizyt.setParent(None)
+            del self.lista_wizyt
+
+        if hasattr(self, 'list_header_lbl'):
+            self.list_header_lbl.setParent(None)
+            del self.list_header_lbl
+
+        # Czyszczenie layoutu dla pewności
         if self.main_v_layout:
             while self.main_v_layout.count():
                 item = self.main_v_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+                w = item.widget()
+                if w: w.deleteLater()
 
-        # === 1. SEKCJA PACJENTA (Domyślnie ukryta) ===
+        # --- KROK 2: BUDOWANIE NOWEGO INTERFEJSU ---
+
+        # === 1. SEKCJA PACJENTA (Domyślnie UKRYTA) ===
         self.lbl_patient = QLabel("KARTA PACJENTA", self.main_content_frame)
         self.lbl_patient.setStyleSheet("color: #8E44AD; font-size: 18px; font-weight: bold; margin-bottom: 5px;")
-        self.lbl_patient.setVisible(False)
+        self.lbl_patient.setVisible(False)  # UKRYTE NA STARCIE
         self.main_v_layout.addWidget(self.lbl_patient)
 
         self.header_patient = self.create_header_bar(self.main_content_frame, "PESEL")
-        self.header_patient.setVisible(False)
+        self.header_patient.setVisible(False)  # UKRYTE NA STARCIE
         self.main_v_layout.addWidget(self.header_patient)
 
         self.list_patient = QListWidget()
         self.list_patient.setFrameShape(QFrame.Shape.NoFrame)
         self.list_patient.setStyleSheet("background-color: transparent;")
         self.list_patient.itemClicked.connect(lambda item: self.handle_list_click(item, "patient"))
-        self.list_patient.setVisible(False)
+        self.list_patient.setVisible(False)  # UKRYTE NA STARCIE
         self.main_v_layout.addWidget(self.list_patient)
 
-        # === 2. SEKCJA DZISIAJ ===
+        # === 2. SEKCJA DZISIAJ (Widoczna) ===
         lbl_today = QLabel("TWOJE WIZYTY - DZISIAJ", self.main_content_frame)
         lbl_today.setStyleSheet(
             "color: #E74C3C; font-size: 18px; font-weight: bold; margin-bottom: 5px; margin-top: 15px;")
@@ -173,7 +205,7 @@ class DoctorWindow(BaseWindow):
         self.list_today.itemClicked.connect(lambda item: self.handle_list_click(item, "today"))
         self.main_v_layout.addWidget(self.list_today)
 
-        # === 3. SEKCJA PRZYSZŁOŚĆ ===
+        # === 3. SEKCJA PRZYSZŁOŚĆ (Widoczna) ===
         lbl_future = QLabel("TWOJE WIZYTY - NADCHODZĄCE", self.main_content_frame)
         lbl_future.setStyleSheet(
             "color: #3498DB; font-size: 18px; font-weight: bold; margin-bottom: 5px; margin-top: 15px;")
@@ -230,6 +262,7 @@ class DoctorWindow(BaseWindow):
 
     def reset_to_my_schedule(self):
         """Ukrywa sekcję pacjenta i odświeża wizyty lekarza."""
+        # Ukrywamy sekcję pacjenta
         self.lbl_patient.setVisible(False)
         self.header_patient.setVisible(False)
         self.list_patient.setVisible(False)
@@ -238,7 +271,9 @@ class DoctorWindow(BaseWindow):
         self.refresh_list()
 
     def refresh_list(self):
-        """Odświeża listy lekarza. Używa lokalnej daty Pythona."""
+        """Odświeża listy lekarza (Dzisiaj i Przyszłość)."""
+
+        # Bezpiecznik na start
         if not hasattr(self, 'list_today'): return
 
         self.current_selected_frame = None
@@ -249,14 +284,12 @@ class DoctorWindow(BaseWindow):
 
         if not self.connection: return
 
-        # Pobieramy DZISIEJSZĄ datę z komputera (nie z serwera bazy, żeby uniknąć różnic stref czasowych)
+        # Pobieramy datę lokalną
         today_date = date.today()
-        print(f"DEBUG: Pobieram wizyty dla lekarza ID={self.user_id} na dzień={today_date}")
 
         try:
             with self.connection.cursor() as cursor:
                 # 1. WIZYTY DZISIEJSZE
-                # Porównujemy samą datę (rzutowanie ::date w Postgres) z naszą lokalną datą
                 query_today = """
                     SELECT id, visit_date, title, pesel, recommendations
                     FROM visits 
@@ -265,7 +298,6 @@ class DoctorWindow(BaseWindow):
                 """
                 cursor.execute(query_today, (self.user_id, today_date))
                 rows_today = cursor.fetchall()
-                print(f"DEBUG: Znaleziono {len(rows_today)} wizyt na dzisiaj.")
                 self.populate_list(self.list_today, rows_today)
 
                 # 2. WIZYTY PRZYSZŁE
@@ -277,13 +309,13 @@ class DoctorWindow(BaseWindow):
                 """
                 cursor.execute(query_future, (self.user_id, today_date))
                 rows_future = cursor.fetchall()
-                print(f"DEBUG: Znaleziono {len(rows_future)} wizyt przyszłych.")
                 self.populate_list(self.list_future, rows_future)
 
         except Exception as e:
             print(f"SQL Error: {e}")
 
     def load_patient_by_code(self):
+        """Ładuje historię pacjenta do 3. tabeli i ją odkrywa."""
         code = self.code_input.text().strip()
         if len(code) != 6:
             QMessageBox.warning(self, "Błąd", "Kod musi mieć 6 cyfr.")
@@ -315,6 +347,8 @@ class DoctorWindow(BaseWindow):
                 self.populate_list(self.list_patient, rows)
 
                 self.lbl_patient.setText(f"HISTORIA PACJENTA: {pesel}")
+
+                # --- POKAZUJEMY TABELĘ PACJENTA ---
                 self.lbl_patient.setVisible(True)
                 self.header_patient.setVisible(True)
                 self.list_patient.setVisible(True)
@@ -367,16 +401,19 @@ class DoctorWindow(BaseWindow):
             target_list_widget.setItemWidget(list_item, frame)
 
     def handle_list_click(self, item, source):
+        """Obsługuje kliknięcie w jedną z 3 list i czyści zaznaczenie w pozostałych."""
         all_lists = {
             "patient": self.list_patient,
             "today": self.list_today,
             "future": self.list_future
         }
 
+        # Czyścimy inne listy
         for key, lst in all_lists.items():
             if key != source:
                 lst.clearSelection()
                 lst.setCurrentItem(None)
+                # Reset stylów w innych listach
                 for i in range(lst.count()):
                     it = lst.item(i)
                     wid = lst.itemWidget(it)
@@ -385,6 +422,8 @@ class DoctorWindow(BaseWindow):
                         wid.setStyleSheet(f"background-color: {bg}; border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
 
         active_list = all_lists[source]
+
+        # Reset stylów w aktywnej liście
         for i in range(active_list.count()):
             it = active_list.item(i)
             wid = active_list.itemWidget(it)
@@ -392,6 +431,7 @@ class DoctorWindow(BaseWindow):
                 bg = "#FFFFFF" if i % 2 == 0 else "#F8F9F9"
                 wid.setStyleSheet(f"background-color: {bg}; border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
 
+        # Podświetlamy wybrany
         selected_frame = active_list.itemWidget(item)
         if selected_frame:
             selected_frame.setStyleSheet(
@@ -403,11 +443,16 @@ class DoctorWindow(BaseWindow):
         if not self.current_selected_frame:
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy.")
             return
+
         visit_id = self.current_selected_frame.property("visit_id")
         data = self.current_selected_data
         current_recs = data[3] if data and len(data) > 3 else ""
-        if not visit_id: return
+
+        if not visit_id:
+            return
+
         if AddRecommendationWindow(visit_id, current_recs, self).exec():
+            # Odświeżamy widok w zależności od tego co było otwarte
             if self.list_patient.isVisible():
                 self.load_patient_by_code()
             else:
@@ -417,6 +462,8 @@ class DoctorWindow(BaseWindow):
         if not self.current_selected_frame:
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy.")
             return
+
         visit_id = self.current_selected_frame.property("visit_id")
         if not visit_id: return
+
         AddLabTestWindow(visit_id, self).exec()
