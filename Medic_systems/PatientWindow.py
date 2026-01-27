@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QFrame, QPushButton
                                QMessageBox, QListWidgetItem, QHBoxLayout, QScrollArea,
                                QWidget, QLineEdit, QComboBox, QCalendarWidget,
                                QGridLayout, QTableView, QTextEdit)
-from PySide6.QtCore import Qt, QSize, QDate
+from PySide6.QtCore import Qt, QSize, QDate, QLocale
 from PySide6.QtGui import QPalette, QColor
 from BaseWindow import BaseWindow, conn_str
 
@@ -18,7 +18,7 @@ class BookVisitWindow(QDialog):
         self.patient_pesel = patient_pesel
         self.selected_time = None
         self.setWindowTitle("Umów Wizytę")
-        self.resize(520, 750)
+        self.resize(520, 800)  # Troszkę wyższe
 
         # --- STYLIZACJA ---
         self.setStyleSheet("""
@@ -37,15 +37,15 @@ class BookVisitWindow(QDialog):
             QCalendarWidget QWidget { 
                 alternate-background-color: #E8F6F3; 
                 background-color: white;
+                color: black;
             }
 
-            /* GÓRNY PASEK (MIESIĄC/ROK) */
+            /* GÓRNY PASEK */
             QCalendarWidget QWidget#qt_calendar_navigationbar { 
                 background-color: white; 
                 border-bottom: 1px solid #BDC3C7;
             }
 
-            /* PRZYCISKI NAWIGACJI */
             QCalendarWidget QToolButton {
                 color: #2C3E50;
                 font-weight: bold;
@@ -58,13 +58,13 @@ class BookVisitWindow(QDialog):
                 border-radius: 5px;
             }
 
-            /* DNI W KALENDARZU (Widok Tabeli) */
+            /* DNI W KALENDARZU */
             QCalendarWidget QAbstractItemView {
                 font-size: 14px;
                 color: #000000;
                 background-color: white;
-                selection-background-color: #3498DB; /* WYRAŹNY NIEBIESKI */
-                selection-color: white;              /* BIAŁY TEKST */
+                selection-background-color: #3498DB; 
+                selection-color: white;
                 border: none;
                 outline: 0;
             }
@@ -90,23 +90,25 @@ class BookVisitWindow(QDialog):
         self.calendar.setMinimumDate(datetime.now().date())
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
 
-        # --- FIX KOLORÓW KALENDARZA (Wymuszenie Palety) ---
-        # To naprawia problem "nie widać zaznaczenia" poprzez bezpośrednią ingerencję w komponent tabeli
+        # FIX KOLORÓW
         table_view = self.calendar.findChild(QTableView, "qt_calendar_calendarview")
         if table_view:
             palette = table_view.palette()
-            # Kolor tła zaznaczenia (Granatowy/Niebieski)
             palette.setColor(QPalette.ColorRole.Highlight, QColor("#2980B9"))
-            # Kolor tekstu zaznaczenia (Biały)
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
-            # Kolor tła zwykłego
             palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.white)
-            # Kolor tekstu zwykłego
             palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.black)
             table_view.setPalette(palette)
 
         self.calendar.clicked.connect(self.on_calendar_clicked)
         layout.addWidget(self.calendar)
+
+        # --- NOWOŚĆ: Etykieta potwierdzająca wybór ---
+        self.lbl_selection = QLabel("Nie wybrano daty")
+        self.lbl_selection.setStyleSheet(
+            "color: #E67E22; font-size: 14px; font-weight: bold; border: 1px solid #E67E22; border-radius: 4px; padding: 5px; background-color: #FDF2E9;")
+        self.lbl_selection.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.lbl_selection)
 
         # 3. GODZINY
         self.lbl_hours = QLabel("3. Wybierz Godzinę:")
@@ -156,7 +158,9 @@ class BookVisitWindow(QDialog):
         # Ładujemy dane
         self.load_doctors()
         self.doctor_combo.currentIndexChanged.connect(self.refresh_time_slots)
-        self.refresh_time_slots()
+
+        # Ustawiamy domyślnie dzisiejszą datę
+        self.on_calendar_clicked(QDate.currentDate())
 
     def load_doctors(self):
         try:
@@ -176,12 +180,26 @@ class BookVisitWindow(QDialog):
             QMessageBox.critical(self, "Błąd", f"Błąd listy lekarzy: {e}")
 
     def on_calendar_clicked(self, date):
+        # Aktualizacja etykiety wyboru
+        selected_date = self.calendar.selectedDate().toPython()
+        # Formatowanie daty po polsku (uproszczone)
+        days = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
+        day_name = days[selected_date.weekday()]
+
+        if selected_date.weekday() >= 5:
+            self.lbl_selection.setText(f"{selected_date} ({day_name}) - WEEKEND (Zamknięte)")
+            self.lbl_selection.setStyleSheet(
+                "color: #E74C3C; font-size: 14px; font-weight: bold; border: 1px solid #E74C3C; border-radius: 4px; padding: 5px; background-color: #FADBD8;")
+        else:
+            self.lbl_selection.setText(f"WYBRANO: {selected_date} ({day_name})")
+            self.lbl_selection.setStyleSheet(
+                "color: #27AE60; font-size: 14px; font-weight: bold; border: 1px solid #27AE60; border-radius: 4px; padding: 5px; background-color: #D5F5E3;")
+
         self.refresh_time_slots()
 
     def refresh_time_slots(self):
         if not hasattr(self, 'time_slots_layout'): return
 
-        # 1. Czyścimy stare przyciski
         for i in reversed(range(self.time_slots_layout.count())):
             item = self.time_slots_layout.itemAt(i)
             if item.widget():
@@ -196,18 +214,16 @@ class BookVisitWindow(QDialog):
         q_date = self.calendar.selectedDate()
         selected_date = date(q_date.year(), q_date.month(), q_date.day())
 
-        # --- SPRAWDZENIE WEEKENDU (0=Pon, 5=Sob, 6=Niedz) ---
         if selected_date.weekday() >= 5:
-            lbl = QLabel("Lekarz nie przyjmuje w weekendy.\nWybierz dzień od poniedziałku do piątku.")
+            lbl = QLabel("Lekarz nie przyjmuje w weekendy.")
             lbl.setStyleSheet("color: #E74C3C; font-weight: bold; font-size: 14px;")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.time_slots_layout.addWidget(lbl, 0, 0, 1, 4)
-            self.lbl_hours.setText("3. Wybierz Godzinę (Weekend - Zamknięte):")
+            self.lbl_hours.setText("3. Wybierz Godzinę (Zamknięte):")
             return
 
         self.lbl_hours.setText("3. Wybierz Godzinę:")
 
-        # Pobieramy zajęte godziny z bazy
         taken_times = []
         try:
             conn = psycopg2.connect(conn_str)
@@ -227,7 +243,6 @@ class BookVisitWindow(QDialog):
         except Exception as e:
             print(f"Błąd pobierania zajętości: {e}")
 
-        # Generujemy godziny
         start_h = 7
         end_h = 19
         row = 0
@@ -245,7 +260,6 @@ class BookVisitWindow(QDialog):
 
                 is_taken = time_str in taken_times
 
-                # Blokada przeszłości
                 is_past = False
                 if selected_date == current_dt.date():
                     slot_time = datetime.combine(selected_date, time(h, m))
@@ -265,7 +279,6 @@ class BookVisitWindow(QDialog):
                     btn.setStyleSheet("background-color: #BDC3C7; color: #888; border: none; border-radius: 4px;")
                     btn.setToolTip("Termin minął")
                 else:
-                    # Wolny termin
                     btn.setStyleSheet("""
                         QPushButton { 
                             background-color: #27AE60; 
@@ -287,7 +300,7 @@ class BookVisitWindow(QDialog):
                 self.time_slots_layout.addWidget(btn, row, col)
 
                 col += 1
-                if col > 4:  # 5 kolumn
+                if col > 4:
                     col = 0
                     row += 1
 
@@ -354,12 +367,12 @@ class BookVisitWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- OKNO SZCZEGÓŁÓW (WIZYTA + ZALECENIA) ---
+# --- OKNO SZCZEGÓŁÓW (Wspólne) ---
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, recommendations=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Karta Wizyty")
-        self.resize(550, 700)  # Nieco wyższe, żeby zmieścić zalecenia
+        self.resize(550, 700)
         self.setStyleSheet("""
             QDialog { background-color: #F8F9FA; }
             QLabel { color: #2C3E50; }
@@ -371,12 +384,10 @@ class VisitDetailsWindow(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Tytuł
         title_lbl = QLabel(f"{tytul_wizyty}", self)
         title_lbl.setStyleSheet("color: #2C3E50; font-size: 22px; font-weight: bold; border: none;")
         layout.addWidget(title_lbl)
 
-        # Info podstawowe
         info_frame = QFrame()
         info_frame.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 8px;")
         info_layout = QVBoxLayout(info_frame)
@@ -390,7 +401,6 @@ class VisitDetailsWindow(QDialog):
         info_layout.addWidget(lbl_doc)
         layout.addWidget(info_frame)
 
-        # --- ZALECENIA LEKARZA (Nowa Sekcja) ---
         layout.addSpacing(10)
         rec_lbl = QLabel("ZALECENIA LEKARSKIE")
         rec_lbl.setStyleSheet(
@@ -402,10 +412,9 @@ class VisitDetailsWindow(QDialog):
         rec_text.setPlaceholderText("Brak zaleceń od lekarza.")
         if recommendations:
             rec_text.setText(recommendations)
-        rec_text.setFixedHeight(100)  # Stała wysokość na zalecenia
+        rec_text.setFixedHeight(100)
         layout.addWidget(rec_text)
 
-        # --- WYNIKI BADAŃ ---
         layout.addSpacing(10)
         header_lbl = QLabel("WYNIKI BADAŃ")
         header_lbl.setStyleSheet(
@@ -446,7 +455,6 @@ class VisitDetailsWindow(QDialog):
         else:
             layout.addWidget(QLabel("Brak zleconych badań.", alignment=Qt.AlignmentFlag.AlignCenter))
 
-        # Zamknij
         close_button = QPushButton("ZAMKNIJ", self)
         close_button.setStyleSheet(
             "QPushButton { background-color: #ECF0F1; color: #2C3E50; border: 1px solid #BDC3C7; padding: 10px 20px; border-radius: 5px; font-weight: bold; } QPushButton:hover { background-color: #D5D8DC; }")
@@ -576,24 +584,23 @@ class PatientWindow(BaseWindow):
         visit_id = self.current_selected_frame.property("visit_id")
 
         lab_results = []
-        recommendations = None  # Zmienna na zalecenia
+        recommendations = None
 
         if self.connection and visit_id:
             try:
                 with self.connection.cursor() as cursor:
-                    # 1. Pobieramy ZALECENIA (recommendations) z tabeli visits
+                    # Pobranie ZALECEŃ
                     cursor.execute("SELECT recommendations FROM visits WHERE id = %s", (visit_id,))
                     rec_row = cursor.fetchone()
                     if rec_row and rec_row[0]:
                         recommendations = rec_row[0]
 
-                    # 2. Pobieramy WYNIKI BADAŃ
+                    # Pobranie WYNIKÓW BADAŃ
                     cursor.execute("SELECT title, description FROM lab_tests WHERE visit_id = %s", (visit_id,))
                     lab_results = cursor.fetchall()
             except Exception as e:
                 print(f"Błąd pobierania szczegółów: {e}")
 
-        # Przekazujemy zalecenia do okna szczegółów
         VisitDetailsWindow(d, t, o, lab_results=lab_results, recommendations=recommendations, parent=self).exec()
 
     def fetch_code(self):
