@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
+# --- KONFIGURACJA BAZY DANYCH ---
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
 
 
@@ -12,64 +13,61 @@ conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Szczegóły Wizyty")
-        self.resize(500, 550)
-        self.setStyleSheet("background-color: #F0F0F0;")
+        self.setWindowTitle(f"Karta Wizyty")
+        self.resize(550, 600)
+        self.setStyleSheet("background-color: #F8F9FA;")
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
 
-        title_lbl = QLabel(f"<h2>{tytul_wizyty}</h2>", self)
-        title_lbl.setStyleSheet("color: black; border: none;")
+        title_lbl = QLabel(f"{tytul_wizyty}", self)
+        title_lbl.setStyleSheet("color: #2C3E50; font-size: 22px; font-weight: bold; border: none;")
         layout.addWidget(title_lbl)
 
         info_frame = QFrame()
-        info_frame.setStyleSheet("background-color: white; border: 1px solid #999;")
+        info_frame.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 8px;")
         info_layout = QVBoxLayout(info_frame)
 
-        lbl_date = QLabel(f"<b>Data:</b> {data_wizyty}")
-        lbl_date.setStyleSheet("color: black; font-size: 13px; border: none;")
+        lbl_date = QLabel(f"DATA WIZYTY:\n{data_wizyty}")
+        lbl_date.setStyleSheet("color: #555; font-size: 13px; border: none; font-weight: bold;")
         info_layout.addWidget(lbl_date)
-
-        lbl_doc = QLabel(f"<b>Doktor:</b> {lekarz}")
-        lbl_doc.setStyleSheet("color: black; font-size: 13px; border: none;")
+        info_layout.addSpacing(5)
+        lbl_doc = QLabel(f"PROWADZĄCY:\n{lekarz}")
+        lbl_doc.setStyleSheet("color: #555; font-size: 13px; border: none; font-weight: bold;")
         info_layout.addWidget(lbl_doc)
-
         layout.addWidget(info_frame)
 
         if lab_results:
-            layout.addSpacing(15)
-            layout.addWidget(QLabel("<h3>WYNIKI BADAŃ:</h3>"))
+            layout.addSpacing(20)
+            header_lbl = QLabel("WYNIKI BADAŃ")
+            header_lbl.setStyleSheet(
+                "color: #34495E; font-size: 14px; font-weight: bold; border: none; border-bottom: 2px solid #3498DB; padding-bottom: 5px;")
+            layout.addWidget(header_lbl)
 
             results_area = QScrollArea()
             results_area.setWidgetResizable(True)
-            results_area.setFrameShape(QFrame.Shape.Box)
+            results_area.setFrameShape(QFrame.Shape.NoFrame)
 
             results_content = QWidget()
-            results_content.setStyleSheet("background-color: #DDD;")
+            results_content.setStyleSheet("background-color: transparent;")
             results_layout = QVBoxLayout(results_content)
             results_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
             results_layout.setSpacing(10)
 
             for title, desc in lab_results:
                 res_frame = QFrame()
-                res_frame.setStyleSheet("""
-                    QFrame {
-                        background-color: #FFFFFF; 
-                        border: 1px solid #888;    
-                    }
-                """)
+                res_frame.setStyleSheet("background-color: #FFFFFF; border: 1px solid #D6DBDF; border-radius: 6px;")
                 res_l = QVBoxLayout(res_frame)
-                res_l.setContentsMargins(10, 10, 10, 10)
+                res_l.setContentsMargins(15, 15, 15, 15)
 
                 t_lbl = QLabel(title.upper())
-                t_lbl.setStyleSheet("font-weight: bold; color: #000; font-size: 13px; border: none;")
+                t_lbl.setStyleSheet("font-weight: bold; color: #2980B9; font-size: 14px; border: none;")
 
                 desc_text = desc if desc else "Oczekiwanie na wynik..."
                 d_lbl = QLabel(desc_text)
                 d_lbl.setWordWrap(True)
-                d_lbl.setStyleSheet("color: black; border: none; margin-top: 5px; font-size: 12px;")
+                d_lbl.setStyleSheet(f"color: #2C3E50; border: none; margin-top: 5px; font-size: 13px;")
 
                 res_l.addWidget(t_lbl)
                 res_l.addWidget(d_lbl)
@@ -79,36 +77,51 @@ class VisitDetailsWindow(QDialog):
             layout.addWidget(results_area)
         else:
             layout.addStretch()
-            no_results_lbl = QLabel("Brak wyników badań.")
-            no_results_lbl.setStyleSheet("color: #444; font-style: italic;")
-            layout.addWidget(no_results_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(QLabel("Brak zleconych badań.", alignment=Qt.AlignmentFlag.AlignCenter))
             layout.addStretch()
 
-        close_button = QPushButton("Zamknij", self)
-        close_button.setStyleSheet("""
-            QPushButton {
-                background-color: #CCC; color: black; border: 1px solid #888; padding: 5px;
-            }
-            QPushButton:hover { background-color: #BBB; }
-        """)
+        close_button = QPushButton("ZAMKNIJ", self)
+        close_button.setStyleSheet(
+            "QPushButton { background-color: #ECF0F1; color: #2C3E50; border: 1px solid #BDC3C7; padding: 10px 20px; border-radius: 5px; font-weight: bold; } QPushButton:hover { background-color: #D5D8DC; }")
         close_button.clicked.connect(self.accept)
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
 
+# --- OKNO WYLOGOWANIA ---
 class LogoutWindow(QDialog):
     def __init__(self, parent=None, on_logged_out=None):
         super().__init__(parent)
         self.setWindowTitle("Wylogowanie")
-        self.resize(400, 200)
+        self.resize(350, 180)
+        self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("<h2>Potwierdzenie</h2>", self))
-        layout.addWidget(QLabel("Czy na pewno chcesz się wylogować?", self))
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+
+        lbl = QLabel("Czy na pewno chcesz się wylogować?", self)
+        lbl.setWordWrap(True)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setStyleSheet("font-size: 16px; color: #333; font-weight: 500;")
+        layout.addWidget(lbl)
 
         btn_layout = QHBoxLayout()
-        cancel_button = QPushButton("Anuluj", self)
+        btn_layout.setSpacing(15)
+
+        cancel_button = QPushButton("ANULUJ", self)
+        cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_button.setStyleSheet("""
+            QPushButton { background-color: #ECF0F1; color: #333; border: none; padding: 10px; border-radius: 4px; font-weight: bold;}
+            QPushButton:hover { background-color: #D0D3D4; }
+        """)
         cancel_button.clicked.connect(self.reject)
-        logout_button = QPushButton("Wyloguj", self)
+
+        logout_button = QPushButton("WYLOGUJ", self)
+        logout_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        logout_button.setStyleSheet("""
+            QPushButton { background-color: #E74C3C; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold;}
+            QPushButton:hover { background-color: #C0392B; }
+        """)
         logout_button.clicked.connect(self._logout)
 
         btn_layout.addWidget(cancel_button)
@@ -131,53 +144,86 @@ class BaseWindow(QWidget):
 
         self.setWindowTitle(f"MedEX-POL - Panel: {self.role_title}")
         self.resize(1200, 800)
-        self.set_palette()
 
         self.current_selected_frame = None
         self.current_selected_data = None
+
+        # Nawiązanie połączenia z bazą
         self.connection = self.connect_to_database()
 
+        # Layouty
         self.main_h_layout = QHBoxLayout(self)
         self.main_h_layout.setContentsMargins(0, 0, 0, 0)
         self.main_h_layout.setSpacing(0)
 
+        # Panel boczny
         self.side_panel = QFrame(self)
-        self.side_panel.setFixedWidth(300)
-        self.side_panel.setStyleSheet("background-color: rgb(172, 248, 122); border-right: 1px solid #999;")
+        self.side_panel.setFixedWidth(280)
+        self.side_panel.setStyleSheet("background-color: #2C3E50; border: none;")
 
         self.side_layout = QVBoxLayout(self.side_panel)
         self.side_layout.setSpacing(15)
         self.side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.side_layout.setContentsMargins(20, 50, 20, 20)
+        self.side_layout.setContentsMargins(20, 40, 20, 20)
 
+        # Panel główny
         self.main_content_frame = QFrame(self)
-        self.main_content_frame.setStyleSheet("background-color: rgb(240, 255, 230);")
+        self.main_content_frame.setStyleSheet("background-color: #ECF0F1;")
         self.main_v_layout = QVBoxLayout(self.main_content_frame)
-        self.main_v_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_v_layout.setContentsMargins(30, 30, 30, 30)
         self.main_v_layout.setSpacing(0)
 
+        # Nagłówek listy
+        self.list_header_lbl = QLabel(f"LISTA WIZYT", self.main_content_frame)
+        self.list_header_lbl.setStyleSheet("color: #2C3E50; font-size: 24px; font-weight: bold; margin-bottom: 15px;")
+        self.main_v_layout.addWidget(self.list_header_lbl)
+
+        # Lista
         self.lista_wizyt = QListWidget(self.main_content_frame)
         self.lista_wizyt.setFrameShape(QFrame.Shape.NoFrame)
         self.lista_wizyt.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.lista_wizyt.setStyleSheet("QListWidget { background-color: rgb(240, 255, 230); color: black; }")
+        self.lista_wizyt.setStyleSheet("""
+            QListWidget { background-color: transparent; outline: none; }
+            QScrollBar:vertical { width: 10px; background: #ECF0F1; }
+            QScrollBar::handle:vertical { background: #BDC3C7; border-radius: 5px; }
+        """)
+        # Podpięcie obsługi kliknięcia
         self.lista_wizyt.itemClicked.connect(self._handle_item_clicked)
+
+    def connect_to_database(self):
+        try:
+            return psycopg2.connect(conn_str)
+        except Exception as e:
+            print(f"Błąd połączenia z bazą: {e}")
+            return None
 
     def init_ui(self):
         self.setup_sidebar_widgets()
-        self.side_layout.addSpacing(20)
 
-        zobacz_btn = self.add_button("ZOBACZ SZCZEGÓŁY")
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet("color: #34495E;")
+        self.side_layout.addWidget(line)
+        self.side_layout.addSpacing(10)
+
+        zobacz_btn = self.add_button("ZOBACZ KARTĘ")
         zobacz_btn.clicked.connect(self._show_visit_details)
 
         self.setup_extra_buttons()
         self.side_layout.addStretch(1)
 
         wyloguj_btn = self.add_button("WYLOGUJ")
-        wyloguj_btn.setStyleSheet(
-            "QPushButton { background-color: #444; color: #FDD; font-size: 14px; border-radius: 8px; padding: 15px; font-weight: bold; } QPushButton:hover { background-color: #622; }")
+        wyloguj_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #C0392B; color: white; border-radius: 6px; 
+                padding: 15px; font-weight: bold; font-size: 13px; 
+                text-align: left; padding-left: 20px; border: none;
+            } 
+            QPushButton:hover { background-color: #E74C3C; }
+        """)
         wyloguj_btn.clicked.connect(self._show_logout_window)
 
-        third_col = "DOKTOR:" if self.role_title == "Pacjent" else "PACJENT (PESEL):"
+        third_col = "LEKARZ" if self.role_title == "Pacjent" else "PESEL"
         header = self.create_header_bar(self.main_content_frame, third_col)
         self.main_v_layout.addWidget(header)
         self.main_v_layout.addWidget(self.lista_wizyt)
@@ -198,24 +244,29 @@ class BaseWindow(QWidget):
         return ""
 
     def refresh_list(self):
+        # Ta funkcja w BaseWindow jest tylko szkieletem dla klas pochodnych
+        # Ale musi mieć implementację dla domyślnego zachowania
         self.current_selected_frame = None
         self.current_selected_data = None
-
         self.lista_wizyt.clear()
+
         query = self.get_sql_query()
         if not query or not self.connection: return
+
         try:
             with self.connection.cursor() as cursor:
-                cursor.execute(query, (self.user_id,))
+                if "%s" in query:
+                    cursor.execute(query, (self.user_id,))
+                else:
+                    cursor.execute(query)
                 rows = cursor.fetchall()
                 self.add_list_items(rows)
         except Exception as e:
             print(f"SQL Error: {e}")
 
     def add_list_items(self, data_rows):
-        styles = ["background-color: #FFFFFF;", "background-color: #E8E8E8;"]
-
-        # Szerokości kolumn (muszą być takie same jak w nagłówku!)
+        # Domyślna implementacja (np. dla Laboranta/Base), Lekarz i Pacjent ją nadpisują
+        styles = ["background-color: #FFFFFF;", "background-color: #F8F9F9;"]
         WIDTH_DATE = 140
         WIDTH_PERSON = 150
 
@@ -225,56 +276,49 @@ class BaseWindow(QWidget):
             list_item.setData(Qt.ItemDataRole.UserRole, (data_str, tytul, str(osoba)))
 
             frame = QFrame()
-            frame.setFixedHeight(60)
-            frame.setStyleSheet(styles[i % 2] + "border-bottom: 1px solid #AAA; color: black;")
+            frame.setFixedHeight(65)
+            frame.setStyleSheet(f"{styles[i % 2]} border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
 
             hl = QHBoxLayout(frame)
-            hl.setContentsMargins(10, 0, 10, 0)
+            hl.setContentsMargins(15, 0, 15, 0)
 
-            # Kolumna 1: Data
-            lbl_date = QLabel(data_str)
-            lbl_date.setFixedWidth(WIDTH_DATE)
-            lbl_date.setStyleSheet("border: none; color: black; font-size: 13px;")
-            hl.addWidget(lbl_date)
+            l1 = QLabel(data_str)
+            l1.setFixedWidth(WIDTH_DATE)
+            l1.setStyleSheet("border: none; color: #555; font-weight: bold;")
+            hl.addWidget(l1)
 
-            # Kolumna 2: Opis (Stretch)
-            lbl_title = QLabel(tytul)
-            lbl_title.setStyleSheet("border: none; color: black; font-size: 13px;")
-            hl.addWidget(lbl_title, stretch=1)
+            l2 = QLabel(tytul)
+            l2.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
+            hl.addWidget(l2, stretch=1)
 
-            # Kolumna 3: Osoba
-            lbl_person = QLabel(str(osoba))
-            lbl_person.setFixedWidth(WIDTH_PERSON)
-            lbl_person.setStyleSheet("border: none; color: black; font-size: 13px;")
-            hl.addWidget(lbl_person)
+            l3 = QLabel(str(osoba))
+            l3.setFixedWidth(WIDTH_PERSON)
+            l3.setStyleSheet("border: none; color: #555;")
+            hl.addWidget(l3)
 
             self.lista_wizyt.addItem(list_item)
-            list_item.setSizeHint(QSize(0, 60))
+            list_item.setSizeHint(QSize(0, 65))
             self.lista_wizyt.setItemWidget(list_item, frame)
 
+    # --- TO JEST FUNKCJA, KTÓREJ BRAKOWAŁO ---
     def _handle_item_clicked(self, item):
-        if self.current_selected_frame:
-            try:
-                # Przywracanie koloru
-                old_index = -1
-                for i in range(self.lista_wizyt.count()):
-                    it = self.lista_wizyt.item(i)
-                    wid = self.lista_wizyt.itemWidget(it)
-                    if wid == self.current_selected_frame:
-                        old_index = i
-                        break
+        # 1. Resetuj styl wszystkich elementów
+        for i in range(self.lista_wizyt.count()):
+            it = self.lista_wizyt.item(i)
+            wid = self.lista_wizyt.itemWidget(it)
+            if wid:
+                bg = "#FFFFFF" if i % 2 == 0 else "#F8F9F9"
+                wid.setStyleSheet(f"background-color: {bg}; border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
 
-                if old_index != -1:
-                    bg_color = "#FFFFFF" if old_index % 2 == 0 else "#E8E8E8"
-                    self.current_selected_frame.setStyleSheet(
-                        f"background-color: {bg_color}; color: black; border-bottom: 1px solid #AAA;")
-
-            except RuntimeError:
-                self.current_selected_frame = None
-
+        # 2. Podświetl wybrany element
         selected_frame = self.lista_wizyt.itemWidget(item)
         if selected_frame:
-            selected_frame.setStyleSheet("background-color: #BDE4F7; border: 1px solid #2F9ADF; color: black;")
+            selected_frame.setStyleSheet("""
+                background-color: #EBF5FB; 
+                border-bottom: 1px solid #AED6F1; 
+                border-left: 5px solid #3498DB; 
+                color: #2C3E50;
+            """)
             self.current_selected_frame = selected_frame
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
@@ -287,83 +331,65 @@ class BaseWindow(QWidget):
         VisitDetailsWindow(d, t, o, lab_results=None, parent=self).exec()
 
     def _show_logout_window(self):
-        LogoutWindow(self, self._handle_logged_out).exec()
-
-    def _handle_logged_out(self):
         from LoginWindow import LoginWindow
         self.close()
         self.login_window = LoginWindow()
         self.login_window.show()
 
     def add_button(self, text):
-        button = QPushButton(text.upper(), self)
-        button.setFixedHeight(60)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setStyleSheet("""
+        btn = QPushButton(text, self)
+        btn.setFixedHeight(50)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("""
             QPushButton { 
-                background-color: #555; color: white; border-radius: 8px; font-weight: bold; font-size: 14px; border: none;
+                background-color: #34495E; color: white; border-radius: 6px; 
+                font-weight: bold; font-size: 13px; 
+                text-align: left; padding-left: 20px; border: none;
             } 
-            QPushButton:hover { background-color: #777; }
+            QPushButton:hover { background-color: #415B76; }
         """)
-        self.side_layout.addWidget(button)
-        return button
+        self.side_layout.addWidget(btn)
+        return btn
 
     def create_header_bar(self, parent, col3_text):
         f = QFrame(parent)
-        f.setFixedHeight(40)
-        f.setStyleSheet("background-color: #666; border-bottom: 2px solid #444;")
+        f.setFixedHeight(45)
+        f.setStyleSheet("background-color: #34495E; border-top-left-radius: 6px; border-top-right-radius: 6px;")
         hl = QHBoxLayout(f)
-        hl.setContentsMargins(10, 0, 10, 0)
+        hl.setContentsMargins(15, 0, 15, 0)
 
-        # Szerokości kolumn
-        WIDTH_DATE = 140
-        WIDTH_PERSON = 150
+        style = "color: white; font-weight: bold; font-size: 12px; border: none;"
 
-        # Kolumna 1: DATA
         l1 = QLabel("DATA")
-        l1.setFixedWidth(WIDTH_DATE)
-        l1.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        l1.setFixedWidth(140)
+        l1.setStyleSheet(style)
         hl.addWidget(l1)
 
-        # Kolumna 2: OPIS (Stretch)
-        l2 = QLabel("OPIS")
-        l2.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        l2 = QLabel("TYTUŁ / OPIS")
+        l2.setStyleSheet(style)
         hl.addWidget(l2, stretch=1)
 
-        # Kolumna 3: OSOBA
         l3 = QLabel(col3_text)
-        l3.setFixedWidth(WIDTH_PERSON)
-        l3.setStyleSheet("color: white; font-weight: bold; font-size: 12px; border: none;")
+        l3.setFixedWidth(150)
+        l3.setStyleSheet(style)
         hl.addWidget(l3)
 
         f.setLayout(hl)
         return f
 
-    def set_palette(self):
-        palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(qRgb(172, 248, 122)))
-        self.setPalette(palette)
-
-    def connect_to_database(self):
-        try:
-            return psycopg2.connect(conn_str)
-        except Exception as e:
-            print(f"DB Error: {e}")
-            return None
-
     def setup_info_widget(self, title, subtitle):
-        frame = QFrame(self)
-        frame.setFixedHeight(80)
-        frame.setStyleSheet("background-color: #4A4A4A; border-radius: 10px;")
-        layout = QVBoxLayout(frame)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(2)
+        f = QFrame(self)
+        f.setFixedHeight(90)
+        f.setStyleSheet("background-color: #243442; border-radius: 8px;")
+        l = QVBoxLayout(f)
+        l.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        l.setSpacing(5)
 
-        l1 = QLabel(title, frame)
-        l1.setStyleSheet("color: white; font-size: 16px; font-weight: bold; border: none;")
-        l2 = QLabel(subtitle, frame)
-        l2.setStyleSheet("color: #CCCCCC; font-size: 11px; border: none;")
+        l1 = QLabel(title, f)
+        l1.setStyleSheet("color: #3498DB; font-size: 14px; font-weight: 800; border: none;")
+        l2 = QLabel(subtitle, f)
+        l2.setStyleSheet("color: #BDC3C7; font-size: 12px; border: none;")
 
-        layout.addWidget(l1)
-        layout.addWidget(l2)
-        self.side_layout.addWidget(frame)
+        l.addWidget(l1)
+        l.addWidget(l2)
+        self.side_layout.addWidget(f)

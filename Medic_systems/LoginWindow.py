@@ -1,164 +1,164 @@
 import psycopg2
 import bcrypt
-from PySide6.QtWidgets import (QWidget, QLineEdit, QPushButton, QVBoxLayout,
-                               QMessageBox, QLabel)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit,
+                               QPushButton, QMessageBox, QFrame)
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QCursor
 
-conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
+# Importy okien
+from DoctorWindow import DoctorWindow
+from LaborantWindow import LaborantWindow
+from PatientWindow import PatientWindow
+from BaseWindow import conn_str
 
 
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MedEX-POL - Logowanie")
-        self.resize(350, 450)
+        self.resize(500, 650)  # Nieco wyższe okno
+        self.setStyleSheet("background-color: #ECF0F1;")
 
-        # --- STYLESHEET (Wygląd) ---
-        # Używamy koloru: rgb(172, 248, 122) -> Hex: #ACF87A
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #ACF87A; 
-                font-family: 'Segoe UI', sans-serif;
-                color: #000000;
-            }
+        main_layout = QVBoxLayout(self)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            /* Pola tekstowe - Wyraźny tekst */
-            QLineEdit {
-                background-color: #FFFFFF;  /* Białe tło */
-                color: #000000;             /* Czarny tekst (wymuszony) */
-                border: 2px solid #555555;
-                border-radius: 10px;
-                padding: 10px;
-                font-size: 14px;
-                font-weight: normal;
-            }
-            QLineEdit:focus {
-                border: 2px solid #0055AA;  /* Niebieska ramka po kliknięciu */
-            }
-
-            /* Przyciski */
-            QPushButton {
-                background-color: #FFFFFF;
-                color: #000000;
-                border: 2px solid #555555;
-                border-radius: 10px;
-                padding: 12px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #E0E0E0; /* Lekko szary po najechaniu */
-            }
-            QPushButton:pressed {
-                background-color: #CCCCCC;
-            }
-
-            /* Specyficzne style dla etykiet */
-            QLabel#title {
-                font-size: 26px;
-                font-weight: bold;
-                color: #222222;
-                margin-bottom: 5px;
-            }
-            QLabel#subtitle {
-                font-size: 14px;
-                color: #444444;
-                margin-bottom: 20px;
-            }
+        self.login_card = QFrame()
+        self.login_card.setFixedSize(380, 500)
+        self.login_card.setStyleSheet("""
+            QFrame { background-color: white; border-radius: 10px; border: 1px solid #BDC3C7; }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(15)
-        layout.setContentsMargins(40, 40, 40, 40)
+        card_layout = QVBoxLayout(self.login_card)
+        card_layout.setSpacing(15)
+        card_layout.setContentsMargins(40, 40, 40, 40)
 
-        # Nagłówek
-        title = QLabel("MedEX-POL", objectName="title")
+        title = QLabel("Witaj w MedEX")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #2C3E50; font-size: 26px; font-weight: bold; border: none;")
 
-        subtitle = QLabel("Panel Logowania", objectName="subtitle")
+        subtitle = QLabel("System Obsługi Medycznej")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet("color: #7F8C8D; font-size: 14px; margin-bottom: 20px; border: none;")
 
-        # Pola tekstowe
-        self.login_box = QLineEdit(self)
-        self.login_box.setPlaceholderText("Login")
+        input_style = """
+            QLineEdit { background-color: #F8F9F9; border: 1px solid #BDC3C7; border-radius: 5px; padding: 12px; font-size: 14px; color: #2C3E50; }
+            QLineEdit:focus { border: 2px solid #3498DB; background-color: white; }
+        """
 
-        self.password_box = QLineEdit(self)
-        self.password_box.setPlaceholderText("Hasło")
-        self.password_box.setEchoMode(QLineEdit.Password)
+        self.login_input = QLineEdit()
+        self.login_input.setPlaceholderText("Login / PESEL")
+        self.login_input.setStyleSheet(input_style)
 
-        # Przyciski
-        login_btn = QPushButton("ZALOGUJ SIĘ", objectName="loginBtn")
-        login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        login_btn.clicked.connect(self.login_user)
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Hasło")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setStyleSheet(input_style)
+        self.password_input.returnPressed.connect(self.handle_login)
 
-        reg_btn = QPushButton("Załóż konto", objectName="regBtn")
-        reg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        reg_btn.clicked.connect(self.show_register)
+        # Przycisk ZALOGUJ
+        self.login_btn = QPushButton("ZALOGUJ SIĘ")
+        self.login_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.login_btn.setFixedHeight(50)
+        self.login_btn.setStyleSheet("""
+            QPushButton { background-color: #3498DB; color: white; font-size: 14px; font-weight: bold; border-radius: 5px; border: none; margin-top: 10px; }
+            QPushButton:hover { background-color: #2980B9; }
+        """)
+        self.login_btn.clicked.connect(self.handle_login)
 
-        # Dodawanie do layoutu
-        layout.addStretch()
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addWidget(self.login_box)
-        layout.addWidget(self.password_box)
-        layout.addSpacing(10)
-        layout.addWidget(login_btn)
-        layout.addWidget(reg_btn)
-        layout.addStretch()
+        # Przycisk ZAREJESTRUJ (NOWOŚĆ)
+        self.register_btn = QPushButton("Nie masz konta? Zarejestruj się")
+        self.register_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.register_btn.setStyleSheet("""
+            QPushButton { background-color: transparent; color: #7F8C8D; border: none; margin-top: 5px; }
+            QPushButton:hover { color: #3498DB; text-decoration: underline; }
+        """)
+        self.register_btn.clicked.connect(self.open_register)
 
-    def show_register(self):
-        from RegisterWindow import RegisterWindow
-        self.close()
-        self.register_window = RegisterWindow()
-        self.register_window.show()
+        footer = QLabel("© 2026 MedEX-POL sp. z o.o.")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer.setStyleSheet("color: #BDC3C7; font-size: 11px; margin-top: 20px; border: none;")
 
-    def login_user(self):
-        login = self.login_box.text().strip()
-        password = self.password_box.text().strip()
+        card_layout.addWidget(title)
+        card_layout.addWidget(subtitle)
+        card_layout.addWidget(self.login_input)
+        card_layout.addWidget(self.password_input)
+        card_layout.addWidget(self.login_btn)
+        card_layout.addWidget(self.register_btn)  # Dodano do layoutu
+        card_layout.addWidget(footer)
+        card_layout.addStretch()
+
+        main_layout.addWidget(self.login_card)
+
+    def handle_login(self):
+        login = self.login_input.text().strip()
+        password = self.password_input.text().strip()
 
         if not login or not password:
-            QMessageBox.warning(self, "Błąd", "Wpisz login i hasło.")
+            QMessageBox.warning(self, "Błąd", "Podaj login i hasło!")
             return
 
-        conn = None
         try:
             conn = psycopg2.connect(conn_str)
-            cursor = conn.cursor()
+            with conn.cursor() as cur:
+                # 1. Sprawdzamy Personel/Użytkowników
+                cur.execute("SELECT id, role, password FROM users WHERE login = %s", (login,))
+                user = cur.fetchone()
 
-            cursor.execute("SELECT id, password, role FROM users WHERE login = %s", (login,))
-            result = cursor.fetchone()
+                if user:
+                    user_id, role, db_hash = user
 
-            if result is None:
-                QMessageBox.critical(self, "Błąd", "Nieprawidłowy login lub hasło.")
+                    # Weryfikacja hasła (obsługa hashowanego i zwykłego)
+                    is_valid = False
+                    try:
+                        # Próba weryfikacji jako hash bcrypt
+                        input_bytes = password.encode('utf-8')
+                        hash_bytes = db_hash.encode('utf-8') if isinstance(db_hash, str) else db_hash
+                        if bcrypt.checkpw(input_bytes, hash_bytes):
+                            is_valid = True
+                    except ValueError:
+                        # Fallback jeśli w bazie jest stare hasło (zwykły tekst)
+                        if password == db_hash:
+                            is_valid = True
+
+                    if is_valid:
+                        self.open_dashboard(role, user_id)
+                    else:
+                        QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło!")
+                else:
+                    # 2. Logowanie Pacjenta (Proste sprawdzenie po PESELu)
+                    if len(login) == 11 and login.isdigit():
+                        # Dla uproszczenia: pacjent loguje się tylko numerem PESEL
+                        self.open_dashboard("patient", login)
+                    else:
+                        QMessageBox.warning(self, "Błąd", "Nie znaleziono użytkownika.")
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Błąd Serwera", f"Błąd bazy danych:\n{e}")
+
+    def open_dashboard(self, role, user_id):
+        self.hide()
+        role = role.lower().strip()
+
+        try:
+            if role in ["doctor", "lekarz", "doktor"]:
+                self.dashboard = DoctorWindow(user_id)
+            elif role == "laborant":
+                self.dashboard = LaborantWindow(user_id)
+            elif role in ["patient", "pacjent"]:
+                self.dashboard = PatientWindow(user_id)
+            else:
+                self.show()
+                QMessageBox.critical(self, "Błąd", f"Nieznana rola: '{role}'")
                 return
 
-            user_id, password_hash, role = result
-
-            if bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8")):
-                self.open_main_window(user_id, role)
-            else:
-                QMessageBox.critical(self, "Błąd", "Nieprawidłowy login lub hasło.")
-
+            self.dashboard.show()
         except Exception as e:
-            QMessageBox.critical(self, "Błąd serwera", f"Nie udało się połączyć: {e}")
-        finally:
-            if conn: conn.close()
+            self.show()
+            QMessageBox.critical(self, "Błąd Aplikacji",
+                                 f"Nie udało się otworzyć okna dla roli {role}.\nSzczegóły: {e}")
 
-    def open_main_window(self, user_id, role):
+    def open_register(self):
+        from RegisterWindow import RegisterWindow
         self.close()
-
-        if role == "Pacjent":
-            from PatientWindow import PatientWindow
-            self.win = PatientWindow(user_id)
-        elif role == "Lekarz":
-            from DoctorWindow import DoctorWindow
-            self.win = DoctorWindow(user_id)
-        elif role == "Laborant":
-            from LaborantWindow import LaborantWindow
-            self.win = LaborantWindow(user_id)
-        else:
-            QMessageBox.critical(self, "Błąd", f"Nieznana rola użytkownika: {role}")
-            return
-
-        self.win.show()
+        self.reg_window = RegisterWindow()
+        self.reg_window.show()

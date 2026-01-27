@@ -1,119 +1,162 @@
 import psycopg2
 import bcrypt
 from PySide6.QtWidgets import (QWidget, QLineEdit, QPushButton, QVBoxLayout,
-                               QMessageBox, QLabel, QComboBox)
+                               QMessageBox, QLabel, QComboBox, QFrame)
 from PySide6.QtCore import Qt
-
-conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
+from PySide6.QtGui import QCursor
+from BaseWindow import conn_str
 
 
 class RegisterWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MedEX-POL - Rejestracja")
-        self.resize(350, 500)
+        self.resize(450, 650)
+        self.setStyleSheet("background-color: #ECF0F1;")  # Jasnoszare tło
 
-        # --- STYLESHEET ---
-        # Ten sam kolor tła (#ACF87A) i kontrastowe pola
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #ACF87A;
-                font-family: 'Segoe UI', sans-serif;
-                color: #000000;
-            }
+        # Główny layout
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            /* Pola tekstowe i Lista rozwijana */
-            QLineEdit, QComboBox {
-                background-color: #FFFFFF;
-                color: #000000;  /* Czarny tekst */
-                border: 2px solid #555555;
+        # --- KARTA REJESTRACJI ---
+        card = QFrame()
+        card.setFixedSize(380, 580)
+        card.setStyleSheet("""
+            QFrame {
+                background-color: white;
                 border-radius: 10px;
-                padding: 10px;
-                font-size: 14px;
-            }
-            QLineEdit:focus, QComboBox:focus {
-                border: 2px solid #0055AA;
-            }
-
-            /* Naprawa widoku listy w QComboBox */
-            QComboBox QAbstractItemView {
-                background-color: #FFFFFF;
-                color: #000000;
-                selection-background-color: #2F9ADF;
-            }
-
-            /* Przyciski */
-            QPushButton {
-                background-color: #FFFFFF;
-                color: #000000;
-                border: 2px solid #555555;
-                border-radius: 10px;
-                padding: 12px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #E0E0E0;
-            }
-
-            /* Etykiety */
-            QLabel {
-                font-weight: bold;
-                font-size: 14px;
-                color: #222222;
-            }
-            QLabel#header {
-                font-size: 24px;
-                margin-bottom: 15px;
+                border: 1px solid #BDC3C7;
             }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(10)
-        layout.setContentsMargins(40, 20, 40, 20)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(12)
 
-        header = QLabel("Utwórz konto", objectName="header")
+        # Nagłówek
+        header = QLabel("Utwórz konto")
+        header.setStyleSheet("color: #2C3E50; font-size: 24px; font-weight: bold; border: none; margin-bottom: 5px;")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(header)
+        card_layout.addWidget(header)
 
-        # Pola formularza
-        layout.addWidget(QLabel("PESEL (11 cyfr):"))
-        self.pesel_box = QLineEdit(self)
-        self.pesel_box.setPlaceholderText("Wpisz PESEL")
-        self.pesel_box.setMaxLength(11)
-        layout.addWidget(self.pesel_box)
+        # Style CSS
+        input_style = """
+            QLineEdit, QComboBox { 
+                background-color: #F8F9F9; 
+                border: 1px solid #BDC3C7; 
+                border-radius: 5px; 
+                padding-left: 10px; 
+                height: 40px; 
+                font-size: 13px; 
+                color: #2C3E50; 
+            }
+            QLineEdit:focus, QComboBox:focus { 
+                border: 2px solid #3498DB; 
+                background-color: white; 
+            }
+            QComboBox::drop-down { border: none; }
+        """
+        label_style = "color: #2C3E50; font-weight: bold; font-size: 12px; border: none; margin-top: 5px;"
 
-        layout.addWidget(QLabel("Login:"))
-        self.login_box = QLineEdit(self)
-        self.login_box.setPlaceholderText("Wpisz login")
-        layout.addWidget(self.login_box)
+        # --- 1. WYBÓR ROLI (NA GÓRZE) ---
+        lbl_role = QLabel("Rola w systemie:")
+        lbl_role.setStyleSheet(label_style)
+        card_layout.addWidget(lbl_role)
 
-        layout.addWidget(QLabel("Hasło:"))
-        self.password_box = QLineEdit(self)
-        self.password_box.setPlaceholderText("Wpisz hasło")
-        self.password_box.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.password_box)
-
-        layout.addWidget(QLabel("Rola:"))
-        self.role_combo = QComboBox(self)
+        self.role_combo = QComboBox()
         self.role_combo.addItems(["Pacjent", "Lekarz", "Laborant"])
-        layout.addWidget(self.role_combo)
+        self.role_combo.setStyleSheet(input_style)
+        self.role_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Podłączamy zmianę roli do funkcji aktualizującej formularz
+        self.role_combo.currentTextChanged.connect(self.update_form_ui)
+        card_layout.addWidget(self.role_combo)
 
-        layout.addSpacing(20)
+        # --- 2. ID (PESEL LUB NUMER UPRAWNIENIA) ---
+        self.lbl_id = QLabel("PESEL (11 cyfr):")  # Domyślny tekst
+        self.lbl_id.setStyleSheet(label_style)
+        card_layout.addWidget(self.lbl_id)
 
-        # Przyciski
+        self.id_box = QLineEdit()
+        self.id_box.setPlaceholderText("Wpisz numer PESEL")
+        self.id_box.setMaxLength(11)
+        self.id_box.setStyleSheet(input_style)
+        card_layout.addWidget(self.id_box)
+
+        # --- 3. LOGIN ---
+        lbl_login = QLabel("Login:")
+        lbl_login.setStyleSheet(label_style)
+        card_layout.addWidget(lbl_login)
+
+        self.login_box = QLineEdit()
+        self.login_box.setPlaceholderText("Twój login")
+        self.login_box.setStyleSheet(input_style)
+        card_layout.addWidget(self.login_box)
+
+        # --- 4. HASŁO ---
+        lbl_pass = QLabel("Hasło:")
+        lbl_pass.setStyleSheet(label_style)
+        card_layout.addWidget(lbl_pass)
+
+        self.password_box = QLineEdit()
+        self.password_box.setPlaceholderText("Twoje hasło")
+        self.password_box.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_box.setStyleSheet(input_style)
+        card_layout.addWidget(self.password_box)
+
+        card_layout.addSpacing(15)
+
+        # --- PRZYCISKI ---
         reg_btn = QPushButton("ZAREJESTRUJ SIĘ")
         reg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        reg_btn.setFixedHeight(45)
+        reg_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #27AE60; 
+                color: white; 
+                border-radius: 5px; 
+                font-weight: bold; 
+                font-size: 14px; 
+                border: none; 
+            }
+            QPushButton:hover { background-color: #2ECC71; }
+            QPushButton:pressed { background-color: #1E8449; }
+        """)
         reg_btn.clicked.connect(self.register_user)
-        layout.addWidget(reg_btn)
+        card_layout.addWidget(reg_btn)
 
-        back_btn = QPushButton("Wróć")
+        back_btn = QPushButton("Masz już konto? Zaloguj się")
         back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        back_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: transparent; 
+                color: #7F8C8D; 
+                border: none; 
+                margin-top: 5px; 
+                font-size: 12px;
+            } 
+            QPushButton:hover { color: #3498DB; text-decoration: underline; }
+        """)
         back_btn.clicked.connect(self.show_login)
-        layout.addWidget(back_btn)
+        card_layout.addWidget(back_btn)
 
-        layout.addStretch()
+        card_layout.addStretch()
+        layout.addWidget(card)
+
+        # Ustawienie początkowe formularza
+        self.update_form_ui(self.role_combo.currentText())
+
+    def update_form_ui(self, role):
+        """Zmienia etykietę i walidację pola ID w zależności od roli."""
+        self.id_box.clear()
+        if role == "Pacjent":
+            self.lbl_id.setText("PESEL (11 cyfr):")
+            self.id_box.setPlaceholderText("Wpisz numer PESEL")
+            self.id_box.setMaxLength(11)
+        else:
+            # Dla Lekarza i Laboranta
+            self.lbl_id.setText("Numer Uprawnienia / PWZ:")
+            self.id_box.setPlaceholderText("Wpisz numer uprawnienia")
+            self.id_box.setMaxLength(20)  # Zwiększamy limit znaków
 
     def show_login(self):
         from LoginWindow import LoginWindow
@@ -122,50 +165,64 @@ class RegisterWindow(QWidget):
         self.login_window.show()
 
     def register_user(self):
-        pesel = self.pesel_box.text().strip()
+        user_id = self.id_box.text().strip()  # Tutaj jest PESEL albo PWZ
         login = self.login_box.text().strip()
         password = self.password_box.text().strip()
-        role = self.role_combo.currentText()
+        role_pl = self.role_combo.currentText()
 
-        if not pesel or not login or not password:
+        # Mapowanie ról na angielski (dla bazy danych)
+        role_map = {"Pacjent": "patient", "Lekarz": "doctor", "Laborant": "laborant"}
+        db_role = role_map.get(role_pl, "patient")
+
+        if not user_id or not login or not password:
             QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola!")
             return
 
-        if len(pesel) != 11 or not pesel.isdigit():
-            QMessageBox.warning(self, "Błąd", "PESEL musi składać się z 11 cyfr.")
-            return
+        # Walidacja zależna od roli
+        if role_pl == "Pacjent":
+            if len(user_id) != 11 or not user_id.isdigit():
+                QMessageBox.warning(self, "Błąd", "PESEL musi składać się z 11 cyfr.")
+                return
+        else:
+            # Dla Lekarza/Laboranta sprawdzamy numer uprawnienia
+            if len(user_id) < 5 or not user_id.isdigit():
+                QMessageBox.warning(self, "Błąd", "Podaj poprawny Numer Uprawnienia (min. 5 cyfr).")
+                return
 
         conn = None
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
 
+            # 1. Sprawdź czy login zajęty
             cursor.execute("SELECT id FROM users WHERE login = %s", (login,))
             if cursor.fetchone():
                 QMessageBox.warning(self, "Błąd", "Taki login jest już zajęty!")
                 return
 
-            cursor.execute("SELECT id FROM users WHERE id = %s", (pesel,))
+            # 2. Sprawdź czy ID (PESEL/PWZ) zajęte
+            cursor.execute("SELECT id FROM users WHERE id = %s", (user_id,))
             if cursor.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim numerze PESEL już istnieje!")
+                msg = "Użytkownik o takim numerze PESEL już istnieje!" if role_pl == "Pacjent" else "Użytkownik o takim numerze uprawnienia już istnieje!"
+                QMessageBox.warning(self, "Błąd", msg)
                 return
 
+            # 3. Hashowanie hasła
             hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+            # 4. Zapis do bazy
             cursor.execute(
                 "INSERT INTO users (id, login, password, role) VALUES (%s, %s, %s, %s)",
-                (pesel, login, hashed, role)
+                (user_id, login, hashed, db_role)
             )
 
             conn.commit()
-
             QMessageBox.information(self, "Sukces", "Konto utworzone pomyślnie!\nZaloguj się teraz.")
             self.show_login()
 
         except Exception as e:
             if conn: conn.rollback()
             QMessageBox.critical(self, "Błąd Bazy", f"Wystąpił błąd podczas rejestracji: {e}")
-
         finally:
             if conn:
                 cursor.close()
