@@ -5,17 +5,37 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
 
-# --- KONFIGURACJA BAZY DANYCH ---
 conn_str = "postgresql://neondb_owner:npg_yKUJZNj2ShD0@ep-wandering-silence-agr7tkb5-pooler.c-2.eu-central-1.aws.neon.tech/logowanie_db?sslmode=require&channel_binding=require"
 
+# Wspólny styl dla komunikatów
+MSG_BOX_STYLE = """
+    QMessageBox {
+        background-color: #FFFFFF;
+        color: #000000;
+    }
+    QMessageBox QLabel {
+        color: #000000;
+        background-color: transparent;
+    }
+    QMessageBox QPushButton {
+        background-color: #F0F0F0;
+        color: #000000;
+        border: 1px solid #888888;
+        border-radius: 5px;
+        padding: 5px 15px;
+    }
+    QMessageBox QPushButton:hover {
+        background-color: #E0E0E0;
+    }
+"""
 
-# --- OKNO SZCZEGÓŁÓW WIZYTY ---
+
 class VisitDetailsWindow(QDialog):
     def __init__(self, data_wizyty, tytul_wizyty, lekarz, lab_results=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Karta Wizyty")
         self.resize(550, 600)
-        self.setStyleSheet("background-color: #F8F9FA;")
+        self.setStyleSheet("background-color: #F8F9FA;" + MSG_BOX_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -87,13 +107,12 @@ class VisitDetailsWindow(QDialog):
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
 
 
-# --- OKNO WYLOGOWANIA ---
 class LogoutWindow(QDialog):
     def __init__(self, parent=None, on_logged_out=None):
         super().__init__(parent)
         self.setWindowTitle("Wylogowanie")
         self.resize(350, 180)
-        self.setStyleSheet("background-color: white;")
+        self.setStyleSheet("background-color: white;" + MSG_BOX_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -110,18 +129,14 @@ class LogoutWindow(QDialog):
 
         cancel_button = QPushButton("ANULUJ", self)
         cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        cancel_button.setStyleSheet("""
-            QPushButton { background-color: #ECF0F1; color: #333; border: none; padding: 10px; border-radius: 4px; font-weight: bold;}
-            QPushButton:hover { background-color: #D0D3D4; }
-        """)
+        cancel_button.setStyleSheet(
+            "QPushButton { background-color: #ECF0F1; color: #333; border: none; padding: 10px; border-radius: 4px; font-weight: bold;} QPushButton:hover { background-color: #D0D3D4; }")
         cancel_button.clicked.connect(self.reject)
 
         logout_button = QPushButton("WYLOGUJ", self)
         logout_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        logout_button.setStyleSheet("""
-            QPushButton { background-color: #E74C3C; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold;}
-            QPushButton:hover { background-color: #C0392B; }
-        """)
+        logout_button.setStyleSheet(
+            "QPushButton { background-color: #E74C3C; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold;} QPushButton:hover { background-color: #C0392B; }")
         logout_button.clicked.connect(self._logout)
 
         btn_layout.addWidget(cancel_button)
@@ -135,7 +150,6 @@ class LogoutWindow(QDialog):
             self.on_logged_out()
 
 
-# --- KLASA BAZOWA ---
 class BaseWindow(QWidget):
     def __init__(self, user_id, role_title):
         super().__init__()
@@ -145,18 +159,17 @@ class BaseWindow(QWidget):
         self.setWindowTitle(f"MedEX-POL - Panel: {self.role_title}")
         self.resize(1200, 800)
 
+        # --- APLIKUJEMY STYL KOMUNIKATÓW NA CAŁE OKNO ---
+        self.setStyleSheet(MSG_BOX_STYLE)
+
         self.current_selected_frame = None
         self.current_selected_data = None
-
-        # Nawiązanie połączenia z bazą
         self.connection = self.connect_to_database()
 
-        # Layouty
         self.main_h_layout = QHBoxLayout(self)
         self.main_h_layout.setContentsMargins(0, 0, 0, 0)
         self.main_h_layout.setSpacing(0)
 
-        # Panel boczny
         self.side_panel = QFrame(self)
         self.side_panel.setFixedWidth(280)
         self.side_panel.setStyleSheet("background-color: #2C3E50; border: none;")
@@ -166,28 +179,21 @@ class BaseWindow(QWidget):
         self.side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.side_layout.setContentsMargins(20, 40, 20, 20)
 
-        # Panel główny
         self.main_content_frame = QFrame(self)
         self.main_content_frame.setStyleSheet("background-color: #ECF0F1;")
         self.main_v_layout = QVBoxLayout(self.main_content_frame)
         self.main_v_layout.setContentsMargins(30, 30, 30, 30)
         self.main_v_layout.setSpacing(0)
 
-        # Nagłówek listy
         self.list_header_lbl = QLabel(f"LISTA WIZYT", self.main_content_frame)
         self.list_header_lbl.setStyleSheet("color: #2C3E50; font-size: 24px; font-weight: bold; margin-bottom: 15px;")
         self.main_v_layout.addWidget(self.list_header_lbl)
 
-        # Lista
         self.lista_wizyt = QListWidget(self.main_content_frame)
         self.lista_wizyt.setFrameShape(QFrame.Shape.NoFrame)
         self.lista_wizyt.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.lista_wizyt.setStyleSheet("""
-            QListWidget { background-color: transparent; outline: none; }
-            QScrollBar:vertical { width: 10px; background: #ECF0F1; }
-            QScrollBar::handle:vertical { background: #BDC3C7; border-radius: 5px; }
-        """)
-        # Podpięcie obsługi kliknięcia
+        self.lista_wizyt.setStyleSheet(
+            "QListWidget { background-color: transparent; outline: none; } QScrollBar:vertical { width: 10px; background: #ECF0F1; } QScrollBar::handle:vertical { background: #BDC3C7; border-radius: 5px; }")
         self.lista_wizyt.itemClicked.connect(self._handle_item_clicked)
 
     def connect_to_database(self):
@@ -199,7 +205,6 @@ class BaseWindow(QWidget):
 
     def init_ui(self):
         self.setup_sidebar_widgets()
-
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet("color: #34495E;")
@@ -213,14 +218,8 @@ class BaseWindow(QWidget):
         self.side_layout.addStretch(1)
 
         wyloguj_btn = self.add_button("WYLOGUJ")
-        wyloguj_btn.setStyleSheet("""
-            QPushButton { 
-                background-color: #C0392B; color: white; border-radius: 6px; 
-                padding: 15px; font-weight: bold; font-size: 13px; 
-                text-align: left; padding-left: 20px; border: none;
-            } 
-            QPushButton:hover { background-color: #E74C3C; }
-        """)
+        wyloguj_btn.setStyleSheet(
+            "QPushButton { background-color: #C0392B; color: white; border-radius: 6px; padding: 15px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} QPushButton:hover { background-color: #E74C3C; }")
         wyloguj_btn.clicked.connect(self._show_logout_window)
 
         third_col = "LEKARZ" if self.role_title == "Pacjent" else "PESEL"
@@ -244,15 +243,11 @@ class BaseWindow(QWidget):
         return ""
 
     def refresh_list(self):
-        # Ta funkcja w BaseWindow jest tylko szkieletem dla klas pochodnych
-        # Ale musi mieć implementację dla domyślnego zachowania
         self.current_selected_frame = None
         self.current_selected_data = None
         self.lista_wizyt.clear()
-
         query = self.get_sql_query()
         if not query or not self.connection: return
-
         try:
             with self.connection.cursor() as cursor:
                 if "%s" in query:
@@ -265,11 +260,9 @@ class BaseWindow(QWidget):
             print(f"SQL Error: {e}")
 
     def add_list_items(self, data_rows):
-        # Domyślna implementacja (np. dla Laboranta/Base), Lekarz i Pacjent ją nadpisują
         styles = ["background-color: #FFFFFF;", "background-color: #F8F9F9;"]
         WIDTH_DATE = 140
         WIDTH_PERSON = 150
-
         for i, (data, tytul, osoba) in enumerate(data_rows):
             data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
             list_item = QListWidgetItem()
@@ -282,27 +275,25 @@ class BaseWindow(QWidget):
             hl = QHBoxLayout(frame)
             hl.setContentsMargins(15, 0, 15, 0)
 
-            l1 = QLabel(data_str)
-            l1.setFixedWidth(WIDTH_DATE)
-            l1.setStyleSheet("border: none; color: #555; font-weight: bold;")
-            hl.addWidget(l1)
+            lbl_date = QLabel(data_str)
+            lbl_date.setFixedWidth(WIDTH_DATE)
+            lbl_date.setStyleSheet("border: none; color: #555; font-weight: bold;")
+            hl.addWidget(lbl_date)
 
-            l2 = QLabel(tytul)
-            l2.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
-            hl.addWidget(l2, stretch=1)
+            lbl_title = QLabel(tytul)
+            lbl_title.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
+            hl.addWidget(lbl_title, stretch=1)
 
-            l3 = QLabel(str(osoba))
-            l3.setFixedWidth(WIDTH_PERSON)
-            l3.setStyleSheet("border: none; color: #555;")
-            hl.addWidget(l3)
+            lbl_person = QLabel(str(osoba))
+            lbl_person.setFixedWidth(WIDTH_PERSON)
+            lbl_person.setStyleSheet("border: none; color: #555;")
+            hl.addWidget(lbl_person)
 
             self.lista_wizyt.addItem(list_item)
             list_item.setSizeHint(QSize(0, 65))
             self.lista_wizyt.setItemWidget(list_item, frame)
 
-    # --- TO JEST FUNKCJA, KTÓREJ BRAKOWAŁO ---
     def _handle_item_clicked(self, item):
-        # 1. Resetuj styl wszystkich elementów
         for i in range(self.lista_wizyt.count()):
             it = self.lista_wizyt.item(i)
             wid = self.lista_wizyt.itemWidget(it)
@@ -310,15 +301,10 @@ class BaseWindow(QWidget):
                 bg = "#FFFFFF" if i % 2 == 0 else "#F8F9F9"
                 wid.setStyleSheet(f"background-color: {bg}; border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
 
-        # 2. Podświetl wybrany element
         selected_frame = self.lista_wizyt.itemWidget(item)
         if selected_frame:
-            selected_frame.setStyleSheet("""
-                background-color: #EBF5FB; 
-                border-bottom: 1px solid #AED6F1; 
-                border-left: 5px solid #3498DB; 
-                color: #2C3E50;
-            """)
+            selected_frame.setStyleSheet(
+                "background-color: #EBF5FB; border-bottom: 1px solid #AED6F1; border-left: 5px solid #3498DB; color: #2C3E50;")
             self.current_selected_frame = selected_frame
             self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
@@ -326,7 +312,6 @@ class BaseWindow(QWidget):
         if not self.current_selected_data:
             QMessageBox.warning(self, "Uwaga", "Wybierz wizytę z listy.")
             return
-
         d, t, o = self.current_selected_data
         VisitDetailsWindow(d, t, o, lab_results=None, parent=self).exec()
 
@@ -340,14 +325,8 @@ class BaseWindow(QWidget):
         btn = QPushButton(text, self)
         btn.setFixedHeight(50)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet("""
-            QPushButton { 
-                background-color: #34495E; color: white; border-radius: 6px; 
-                font-weight: bold; font-size: 13px; 
-                text-align: left; padding-left: 20px; border: none;
-            } 
-            QPushButton:hover { background-color: #415B76; }
-        """)
+        btn.setStyleSheet(
+            "QPushButton { background-color: #34495E; color: white; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} QPushButton:hover { background-color: #415B76; }")
         self.side_layout.addWidget(btn)
         return btn
 

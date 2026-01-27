@@ -18,7 +18,7 @@ class BookVisitWindow(QDialog):
         self.setWindowTitle("Umów Wizytę")
         self.resize(520, 750)
 
-        # --- STYLIZACJA (Poprawiona) ---
+        # --- STYLIZACJA ---
         self.setStyleSheet("""
             QDialog { background-color: #F8F9FA; }
             QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
@@ -31,13 +31,12 @@ class BookVisitWindow(QDialog):
                 color: #2C3E50;
             }
 
-            /* KALENDARZ - Wygląd ogólny */
+            /* --- STYL KALENDARZA --- */
             QCalendarWidget QWidget { 
                 alternate-background-color: #E8F6F3; 
                 background-color: white;
             }
 
-            /* Przycisk nawigacji (strzałki, miesiąc) */
             QCalendarWidget QToolButton {
                 color: black;
                 font-weight: bold;
@@ -50,11 +49,28 @@ class BookVisitWindow(QDialog):
                 border-radius: 5px;
             }
 
-            /* Ukrycie pól edycji roku (spinbox) dla czystszego wyglądu */
-            QCalendarWidget QSpinBox {
+            /* DNI KALENDARZA */
+            QCalendarWidget QAbstractItemView:enabled {
+                font-size: 14px;
+                color: #000000;
                 background-color: white;
-                color: black;
-                selection-background-color: #3498DB;
+
+                /* KLUCZOWE: Kolory zaznaczenia */
+                selection-background-color: #2C3E50; /* Granatowy */
+                selection-color: #FFFFFF;            /* Biały tekst */
+
+                border: 1px solid #BDC3C7;
+                outline: 0;
+            }
+
+            /* Dzień po najechaniu myszką */
+            QCalendarWidget QAbstractItemView:enabled:hover {
+                background-color: #D6EAF8;
+            }
+
+            /* Dni zablokowane */
+            QCalendarWidget QAbstractItemView:disabled {
+                color: #BDC3C7;
             }
         """)
 
@@ -69,7 +85,6 @@ class BookVisitWindow(QDialog):
         # 1. WYBÓR LEKARZA
         layout.addWidget(QLabel("1. Wybierz Lekarza:"))
         self.doctor_combo = QComboBox()
-        # Podłączymy sygnał dopiero po załadowaniu danych
         layout.addWidget(self.doctor_combo)
 
         # 2. KALENDARZ
@@ -78,24 +93,6 @@ class BookVisitWindow(QDialog):
         self.calendar.setGridVisible(True)
         self.calendar.setMinimumDate(datetime.now().date())
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-
-        # --- KLUCZOWA POPRAWKA KOLORÓW ---
-        # Znajdujemy wewnętrzną tabelę kalendarza i nakładamy styl bezpośrednio na nią
-        cal_view = self.calendar.findChild(QTableView, "qt_calendar_calendarview")
-        if cal_view:
-            cal_view.setStyleSheet("""
-                QTableView {
-                    background-color: white;
-                    selection-background-color: #3498DB; /* WYRAŹNY NIEBIESKI */
-                    selection-color: white;              /* BIAŁY TEKST */
-                    color: black;
-                    outline: 0;
-                }
-                QTableView::item:hover {
-                    background-color: #D6EAF8;
-                }
-            """)
-
         self.calendar.clicked.connect(self.on_calendar_clicked)
         layout.addWidget(self.calendar)
 
@@ -111,7 +108,6 @@ class BookVisitWindow(QDialog):
         self.time_slots_content = QWidget()
         self.time_slots_content.setStyleSheet("background-color: transparent;")
 
-        # Inicjalizacja layoutu
         self.time_slots_layout = QGridLayout(self.time_slots_content)
         self.time_slots_layout.setSpacing(10)
 
@@ -190,7 +186,6 @@ class BookVisitWindow(QDialog):
         selected_date = date(q_date.year(), q_date.month(), q_date.day())
 
         # --- SPRAWDZENIE WEEKENDU ---
-        # 0=Poniedziałek ... 5=Sobota, 6=Niedziela
         if selected_date.weekday() >= 5:
             lbl = QLabel("Lekarz nie przyjmuje w weekendy.\nWybierz dzień od poniedziałku do piątku.")
             lbl.setStyleSheet("color: #E74C3C; font-weight: bold; font-size: 14px;")

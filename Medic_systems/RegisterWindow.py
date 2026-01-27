@@ -12,35 +12,24 @@ class RegisterWindow(QWidget):
         super().__init__()
         self.setWindowTitle("MedEX-POL - Rejestracja")
         self.resize(450, 650)
-        self.setStyleSheet("background-color: #ECF0F1;")  # Jasnoszare tło
 
-        # Główny layout
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # --- STYLESHEET (NAPRAWIONY) ---
+        self.setStyleSheet("""
+            /* TŁO GŁÓWNEGO OKNA - JASNOSZARE (JAK WCZEŚNIEJ) */
+            QWidget {
+                background-color: #ECF0F1; 
+                font-family: 'Segoe UI', sans-serif;
+                color: #2C3E50;
+            }
 
-        # --- KARTA REJESTRACJI ---
-        card = QFrame()
-        card.setFixedSize(380, 580)
-        card.setStyleSheet("""
-            QFrame {
-                background-color: white;
+            /* STYL KARTY REJESTRACJI (Biały panel na środku) */
+            QFrame#RegisterCard {
+                background-color: #FFFFFF;
                 border-radius: 10px;
                 border: 1px solid #BDC3C7;
             }
-        """)
 
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(30, 30, 30, 30)
-        card_layout.setSpacing(12)
-
-        # Nagłówek
-        header = QLabel("Utwórz konto")
-        header.setStyleSheet("color: #2C3E50; font-size: 24px; font-weight: bold; border: none; margin-bottom: 5px;")
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card_layout.addWidget(header)
-
-        # Style CSS
-        input_style = """
+            /* POLA TEKSTOWE I LISTA */
             QLineEdit, QComboBox { 
                 background-color: #F8F9F9; 
                 border: 1px solid #BDC3C7; 
@@ -52,34 +41,114 @@ class RegisterWindow(QWidget):
             }
             QLineEdit:focus, QComboBox:focus { 
                 border: 2px solid #3498DB; 
-                background-color: white; 
+                background-color: #FFFFFF;
             }
             QComboBox::drop-down { border: none; }
-        """
-        label_style = "color: #2C3E50; font-weight: bold; font-size: 12px; border: none; margin-top: 5px;"
 
-        # --- 1. WYBÓR ROLI (NA GÓRZE) ---
+            /* --- KLUCZOWE: WYGLĄD ROZWINIĘTEJ LISTY --- */
+            QComboBox QAbstractItemView {
+                background-color: #FFFFFF;      /* Białe tło listy */
+                color: #2C3E50;                 /* Ciemny tekst */
+                selection-background-color: #3498DB; /* Niebieskie zaznaczenie */
+                selection-color: #FFFFFF;       /* Biały tekst zaznaczenia */
+                border: 1px solid #BDC3C7;
+                outline: 0;
+            }
+
+            /* PRZYCISKI */
+            QPushButton { 
+                background-color: #FFFFFF; 
+                color: #2C3E50; 
+                border: 1px solid #BDC3C7; 
+                border-radius: 5px; 
+                font-weight: bold; 
+                font-size: 14px; 
+                padding: 10px;
+            }
+            QPushButton:hover { background-color: #D6DBDF; }
+            QPushButton:pressed { background-color: #AEB6BF; }
+
+            /* PRZYCISK "ZAREJESTRUJ" (ZIELONY) */
+            QPushButton#RegisterBtn {
+                background-color: #27AE60; 
+                color: white; 
+                border: none;
+            }
+            QPushButton#RegisterBtn:hover { background-color: #2ECC71; }
+
+            /* PRZYCISK "WRÓĆ" (BEZ TŁA) */
+            QPushButton#BackBtn {
+                background-color: transparent; 
+                color: #7F8C8D; 
+                border: none; 
+                margin-top: 5px; 
+                font-size: 12px; 
+            } 
+            QPushButton#BackBtn:hover { color: #3498DB; text-decoration: underline; }
+
+            /* --- NAPRAWA WYGLĄDU KOMUNIKATÓW (QMessageBox) --- */
+            QMessageBox {
+                background-color: #FFFFFF; /* Białe tło komunikatu */
+                color: #000000;            /* Czarny tekst */
+            }
+            QMessageBox QLabel {
+                color: #000000;
+                background-color: transparent;
+            }
+            QMessageBox QPushButton {
+                background-color: #F0F0F0;
+                color: #000000;
+                border: 1px solid #888888;
+                border-radius: 5px;
+                padding: 5px 15px;
+                min-width: 60px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #E0E0E0;
+            }
+        """)
+
+        # Główny layout
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # --- KARTA (CONTENER) ---
+        card = QFrame()
+        card.setObjectName("RegisterCard")  # Ważne dla stylów
+        card.setFixedSize(380, 600)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(12)
+
+        # Nagłówek
+        header = QLabel("Utwórz konto")
+        header.setStyleSheet(
+            "color: #2C3E50; font-size: 24px; font-weight: bold; border: none; margin-bottom: 5px; background-color: transparent;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(header)
+
+        label_style = "color: #2C3E50; font-weight: bold; font-size: 12px; border: none; margin-top: 5px; background-color: transparent;"
+
+        # --- 1. ROLA ---
         lbl_role = QLabel("Rola w systemie:")
         lbl_role.setStyleSheet(label_style)
         card_layout.addWidget(lbl_role)
 
         self.role_combo = QComboBox()
         self.role_combo.addItems(["Pacjent", "Lekarz", "Laborant"])
-        self.role_combo.setStyleSheet(input_style)
         self.role_combo.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Podłączamy zmianę roli do funkcji aktualizującej formularz
         self.role_combo.currentTextChanged.connect(self.update_form_ui)
         card_layout.addWidget(self.role_combo)
 
-        # --- 2. ID (PESEL LUB NUMER UPRAWNIENIA) ---
-        self.lbl_id = QLabel("PESEL (11 cyfr):")  # Domyślny tekst
+        # --- 2. ID (PESEL/PWZ) ---
+        self.lbl_id = QLabel("PESEL (11 cyfr):")
         self.lbl_id.setStyleSheet(label_style)
         card_layout.addWidget(self.lbl_id)
 
         self.id_box = QLineEdit()
         self.id_box.setPlaceholderText("Wpisz numer PESEL")
         self.id_box.setMaxLength(11)
-        self.id_box.setStyleSheet(input_style)
         card_layout.addWidget(self.id_box)
 
         # --- 3. LOGIN ---
@@ -89,7 +158,6 @@ class RegisterWindow(QWidget):
 
         self.login_box = QLineEdit()
         self.login_box.setPlaceholderText("Twój login")
-        self.login_box.setStyleSheet(input_style)
         card_layout.addWidget(self.login_box)
 
         # --- 4. HASŁO ---
@@ -100,63 +168,39 @@ class RegisterWindow(QWidget):
         self.password_box = QLineEdit()
         self.password_box.setPlaceholderText("Twoje hasło")
         self.password_box.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_box.setStyleSheet(input_style)
         card_layout.addWidget(self.password_box)
 
         card_layout.addSpacing(15)
 
         # --- PRZYCISKI ---
         reg_btn = QPushButton("ZAREJESTRUJ SIĘ")
+        reg_btn.setObjectName("RegisterBtn")  # Styl zielony
         reg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        reg_btn.setFixedHeight(45)
-        reg_btn.setStyleSheet("""
-            QPushButton { 
-                background-color: #27AE60; 
-                color: white; 
-                border-radius: 5px; 
-                font-weight: bold; 
-                font-size: 14px; 
-                border: none; 
-            }
-            QPushButton:hover { background-color: #2ECC71; }
-            QPushButton:pressed { background-color: #1E8449; }
-        """)
         reg_btn.clicked.connect(self.register_user)
         card_layout.addWidget(reg_btn)
 
         back_btn = QPushButton("Masz już konto? Zaloguj się")
+        back_btn.setObjectName("BackBtn")  # Styl tekstowy
         back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        back_btn.setStyleSheet("""
-            QPushButton { 
-                background-color: transparent; 
-                color: #7F8C8D; 
-                border: none; 
-                margin-top: 5px; 
-                font-size: 12px;
-            } 
-            QPushButton:hover { color: #3498DB; text-decoration: underline; }
-        """)
         back_btn.clicked.connect(self.show_login)
         card_layout.addWidget(back_btn)
 
         card_layout.addStretch()
         layout.addWidget(card)
 
-        # Ustawienie początkowe formularza
+        # Inicjalizacja formularza
         self.update_form_ui(self.role_combo.currentText())
 
     def update_form_ui(self, role):
-        """Zmienia etykietę i walidację pola ID w zależności od roli."""
         self.id_box.clear()
         if role == "Pacjent":
             self.lbl_id.setText("PESEL (11 cyfr):")
             self.id_box.setPlaceholderText("Wpisz numer PESEL")
             self.id_box.setMaxLength(11)
         else:
-            # Dla Lekarza i Laboranta
             self.lbl_id.setText("Numer Uprawnienia / PWZ:")
             self.id_box.setPlaceholderText("Wpisz numer uprawnienia")
-            self.id_box.setMaxLength(20)  # Zwiększamy limit znaków
+            self.id_box.setMaxLength(20)
 
     def show_login(self):
         from LoginWindow import LoginWindow
@@ -165,12 +209,11 @@ class RegisterWindow(QWidget):
         self.login_window.show()
 
     def register_user(self):
-        user_id = self.id_box.text().strip()  # Tutaj jest PESEL albo PWZ
+        user_id = self.id_box.text().strip()
         login = self.login_box.text().strip()
         password = self.password_box.text().strip()
         role_pl = self.role_combo.currentText()
 
-        # Mapowanie ról na angielski (dla bazy danych)
         role_map = {"Pacjent": "patient", "Lekarz": "doctor", "Laborant": "laborant"}
         db_role = role_map.get(role_pl, "patient")
 
@@ -178,13 +221,11 @@ class RegisterWindow(QWidget):
             QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola!")
             return
 
-        # Walidacja zależna od roli
         if role_pl == "Pacjent":
             if len(user_id) != 11 or not user_id.isdigit():
                 QMessageBox.warning(self, "Błąd", "PESEL musi składać się z 11 cyfr.")
                 return
         else:
-            # Dla Lekarza/Laboranta sprawdzamy numer uprawnienia
             if len(user_id) < 5 or not user_id.isdigit():
                 QMessageBox.warning(self, "Błąd", "Podaj poprawny Numer Uprawnienia (min. 5 cyfr).")
                 return
@@ -194,23 +235,19 @@ class RegisterWindow(QWidget):
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
 
-            # 1. Sprawdź czy login zajęty
             cursor.execute("SELECT id FROM users WHERE login = %s", (login,))
             if cursor.fetchone():
                 QMessageBox.warning(self, "Błąd", "Taki login jest już zajęty!")
                 return
 
-            # 2. Sprawdź czy ID (PESEL/PWZ) zajęte
             cursor.execute("SELECT id FROM users WHERE id = %s", (user_id,))
             if cursor.fetchone():
                 msg = "Użytkownik o takim numerze PESEL już istnieje!" if role_pl == "Pacjent" else "Użytkownik o takim numerze uprawnienia już istnieje!"
                 QMessageBox.warning(self, "Błąd", msg)
                 return
 
-            # 3. Hashowanie hasła
             hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-            # 4. Zapis do bazy
             cursor.execute(
                 "INSERT INTO users (id, login, password, role) VALUES (%s, %s, %s, %s)",
                 (user_id, login, hashed, db_role)

@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
-# Importy okien
 from DoctorWindow import DoctorWindow
 from LaborantWindow import LaborantWindow
 from PatientWindow import PatientWindow
@@ -16,20 +15,43 @@ class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MedEX-POL - Logowanie")
-        self.resize(500, 650)  # Nieco wyższe okno
-        self.setStyleSheet("background-color: #ECF0F1;")
+        self.resize(500, 600)
+
+        # Styl z naprawionym QMessageBox
+        self.setStyleSheet("""
+            QWidget { background-color: #ECF0F1; }
+
+            QMessageBox {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            QMessageBox QLabel {
+                color: #000000;
+                background-color: transparent;
+            }
+            QMessageBox QPushButton {
+                background-color: #F0F0F0;
+                color: #000000;
+                border: 1px solid #888888;
+                border-radius: 5px;
+                padding: 5px 15px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #E0E0E0;
+            }
+        """)
 
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.login_card = QFrame()
-        self.login_card.setFixedSize(380, 500)
+        self.login_card.setFixedSize(380, 450)
         self.login_card.setStyleSheet("""
             QFrame { background-color: white; border-radius: 10px; border: 1px solid #BDC3C7; }
         """)
 
         card_layout = QVBoxLayout(self.login_card)
-        card_layout.setSpacing(15)
+        card_layout.setSpacing(20)
         card_layout.setContentsMargins(40, 40, 40, 40)
 
         title = QLabel("Witaj w MedEX")
@@ -40,9 +62,21 @@ class LoginWindow(QWidget):
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("color: #7F8C8D; font-size: 14px; margin-bottom: 20px; border: none;")
 
+        # --- NAPRAWA WYGLĄDU PÓL (Wyraźny tekst, brak ucinania) ---
         input_style = """
-            QLineEdit { background-color: #F8F9F9; border: 1px solid #BDC3C7; border-radius: 5px; padding: 12px; font-size: 14px; color: #2C3E50; }
-            QLineEdit:focus { border: 2px solid #3498DB; background-color: white; }
+            QLineEdit { 
+                background-color: #F8F9F9; 
+                border: 1px solid #BDC3C7; 
+                border-radius: 5px; 
+                padding-left: 10px; /* Tylko z lewej, góra/dół automatycznie */
+                height: 45px;       /* Stała wysokość */
+                font-size: 14px; 
+                color: #2C3E50; 
+            }
+            QLineEdit:focus { 
+                border: 2px solid #3498DB; 
+                background-color: white; 
+            }
         """
 
         self.login_input = QLineEdit()
@@ -55,7 +89,6 @@ class LoginWindow(QWidget):
         self.password_input.setStyleSheet(input_style)
         self.password_input.returnPressed.connect(self.handle_login)
 
-        # Przycisk ZALOGUJ
         self.login_btn = QPushButton("ZALOGUJ SIĘ")
         self.login_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.login_btn.setFixedHeight(50)
@@ -65,7 +98,6 @@ class LoginWindow(QWidget):
         """)
         self.login_btn.clicked.connect(self.handle_login)
 
-        # Przycisk ZAREJESTRUJ (NOWOŚĆ)
         self.register_btn = QPushButton("Nie masz konta? Zarejestruj się")
         self.register_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.register_btn.setStyleSheet("""
@@ -83,7 +115,7 @@ class LoginWindow(QWidget):
         card_layout.addWidget(self.login_input)
         card_layout.addWidget(self.password_input)
         card_layout.addWidget(self.login_btn)
-        card_layout.addWidget(self.register_btn)  # Dodano do layoutu
+        card_layout.addWidget(self.register_btn)
         card_layout.addWidget(footer)
         card_layout.addStretch()
 
@@ -100,34 +132,24 @@ class LoginWindow(QWidget):
         try:
             conn = psycopg2.connect(conn_str)
             with conn.cursor() as cur:
-                # 1. Sprawdzamy Personel/Użytkowników
                 cur.execute("SELECT id, role, password FROM users WHERE login = %s", (login,))
                 user = cur.fetchone()
 
                 if user:
                     user_id, role, db_hash = user
-
-                    # Weryfikacja hasła (obsługa hashowanego i zwykłego)
-                    is_valid = False
                     try:
-                        # Próba weryfikacji jako hash bcrypt
-                        input_bytes = password.encode('utf-8')
-                        hash_bytes = db_hash.encode('utf-8') if isinstance(db_hash, str) else db_hash
-                        if bcrypt.checkpw(input_bytes, hash_bytes):
-                            is_valid = True
+                        if bcrypt.checkpw(password.encode('utf-8'),
+                                          db_hash.encode('utf-8') if isinstance(db_hash, str) else db_hash):
+                            self.open_dashboard(role, user_id)
+                        else:
+                            QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło!")
                     except ValueError:
-                        # Fallback jeśli w bazie jest stare hasło (zwykły tekst)
                         if password == db_hash:
-                            is_valid = True
-
-                    if is_valid:
-                        self.open_dashboard(role, user_id)
-                    else:
-                        QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło!")
+                            self.open_dashboard(role, user_id)
+                        else:
+                            QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło.")
                 else:
-                    # 2. Logowanie Pacjenta (Proste sprawdzenie po PESELu)
                     if len(login) == 11 and login.isdigit():
-                        # Dla uproszczenia: pacjent loguje się tylko numerem PESEL
                         self.open_dashboard("patient", login)
                     else:
                         QMessageBox.warning(self, "Błąd", "Nie znaleziono użytkownika.")
