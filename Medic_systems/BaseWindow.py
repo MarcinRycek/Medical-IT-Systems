@@ -123,13 +123,11 @@ class BaseWindow(QWidget):
     def connect_db(self):
         try:
             conn = psycopg2.connect(conn_str)
-            # Ujednolicenie strefy czasowej w sesji DB (ważne dla timestamptz i DATE(visit_date))
             try:
                 with conn.cursor() as cur:
                     cur.execute("SET TIME ZONE 'Europe/Warsaw'")
                 conn.commit()
             except Exception:
-                # nawet jeśli się nie uda, połączenie nadal może działać
                 pass
             return conn
         except:
@@ -171,14 +169,12 @@ class BaseWindow(QWidget):
             return
 
         d = self.current_selected_data[0]
-        t = self.current_selected_data[1]  # To może być tytuł badania
-        o = self.current_selected_data[2]  # Pesel
+        t = self.current_selected_data[1]
+        o = self.current_selected_data[2]
 
-        # Jeśli dane mają więcej elementów, to może być ID wizyty
         vid = None
         recs = None
 
-        # Próba wyciągnięcia visit_id z widgetu (jeśli ustawione)
         if self.current_selected_frame:
             vid = self.current_selected_frame.property("visit_id")
 

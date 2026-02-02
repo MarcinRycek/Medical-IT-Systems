@@ -8,9 +8,7 @@ from BaseWindow import BaseWindow, conn_str
 DAYS_MAP = {0: "Poniedziałek", 1: "Wtorek", 2: "Środa", 3: "Czwartek", 4: "Piątek", 5: "Sobota", 6: "Niedziela"}
 
 
-# --- NOWA KLASA: KLIKALNA KARTA ---
 class ClickableCard(QFrame):
-    """Ramka, która po kliknięciu przełącza powiązany z nią checkbox."""
 
     def __init__(self, checkbox, parent=None):
         super().__init__(parent)
@@ -20,13 +18,11 @@ class ClickableCard(QFrame):
         self.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 6px;")
 
     def mousePressEvent(self, event):
-        # Przełączamy checkbox tylko lewym przyciskiem myszy
         if event.button() == Qt.MouseButton.LeftButton:
             self.checkbox.setChecked(not self.checkbox.isChecked())
         super().mousePressEvent(event)
 
 
-# ----------------------------------
 
 class AdminWindow(BaseWindow):
     def __init__(self, user_id):
@@ -40,7 +36,6 @@ class AdminWindow(BaseWindow):
 
         main_content_layout = QHBoxLayout()
 
-        # --- LEWA STRONA: GRAFIK ---
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0, 0, 10, 0)
@@ -77,7 +72,6 @@ class AdminWindow(BaseWindow):
 
         main_content_layout.addWidget(left_container, stretch=3)
 
-        # --- PRAWA STRONA: ZATWIERDZANIE ---
         right_container = QFrame()
         right_container.setStyleSheet("background-color: white; border-radius: 8px; border: 1px solid #BDC3C7;")
         right_layout = QVBoxLayout(right_container)
@@ -125,11 +119,9 @@ class AdminWindow(BaseWindow):
 
     def create_day_rows(self):
         for day_idx in range(5):
-            # Checkbox
             chk = QCheckBox(DAYS_MAP[day_idx])
             chk.setStyleSheet("font-weight: bold; color: #2C3E50; border: none; background: transparent;")
 
-            # --- ZMIANA: Używamy ClickableCard zamiast QFrame ---
             card = ClickableCard(chk)
 
             hl = QHBoxLayout(card)
@@ -147,7 +139,6 @@ class AdminWindow(BaseWindow):
             self.apply_time_style(t_start, False);
             self.apply_time_style(t_end, False)
 
-            # Lambda z domyślnymi argumentami, aby uniknąć problemów z pętlą
             chk.toggled.connect(lambda c, s=t_start, e=t_end: self.on_day_toggled(c, s, e))
 
             hl.addWidget(chk, stretch=1)

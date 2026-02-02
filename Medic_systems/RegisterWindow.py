@@ -13,7 +13,6 @@ class RegisterWindow(QWidget):
         self.setWindowTitle("MedEX-POL - Rejestracja")
         self.resize(450, 650)
 
-        # --- STYLESHEET ---
         self.setStyleSheet("""
             QWidget { background-color: #ECF0F1; font-family: 'Segoe UI', sans-serif; color: #2C3E50; }
             QFrame#RegisterCard { background-color: #FFFFFF; border-radius: 10px; border: 1px solid #BDC3C7; }
@@ -143,7 +142,6 @@ class RegisterWindow(QWidget):
             QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola!")
             return
 
-        # Walidacja ID
         if role_pl == "Pacjent":
             if len(user_id) != 11 or not user_id.isdigit():
                 QMessageBox.warning(self, "Błąd", "PESEL musi składać się z 11 cyfr.")
@@ -153,7 +151,7 @@ class RegisterWindow(QWidget):
             if len(user_id) < 5 or not user_id.isdigit():
                 QMessageBox.warning(self, "Błąd", "Podaj poprawny Numer Uprawnienia.")
                 return
-            is_active = False  # Lekarz/Laborant wymaga potwierdzenia
+            is_active = False
 
         conn = None
         try:
@@ -172,7 +170,6 @@ class RegisterWindow(QWidget):
 
             hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-            # INSERT z uwzględnieniem is_active
             cursor.execute(
                 "INSERT INTO users (id, login, password, role, is_active) VALUES (%s, %s, %s, %s, %s)",
                 (user_id, login, hashed, db_role, is_active)

@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
-# --- STYLE LOKALNE ---
 LOCAL_DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }
     QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
@@ -25,7 +24,6 @@ LOCAL_DIALOG_STYLE = """
 """
 
 
-# --- OKNO ZLECANIA BADANIA ---
 class AddLabTestWindow(QDialog):
     def __init__(self, visit_id, parent=None):
         super().__init__(parent)
@@ -78,7 +76,6 @@ class AddLabTestWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- OKNO DODAWANIA ZALECEŃ ---
 class AddRecommendationWindow(QDialog):
     def __init__(self, visit_id, current_recs, parent=None):
         super().__init__(parent)
@@ -129,30 +126,23 @@ class AddRecommendationWindow(QDialog):
             QMessageBox.critical(self, "Błąd Bazy", str(e))
 
 
-# --- GŁÓWNE OKNO LEKARZA ---
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
-        # 1. Init BaseWindow
         super().__init__(user_id, "Lekarz")
         self.code_input = None
 
-        # 2. Ręczne budowanie UI
         self.init_ui()
 
     def init_ui(self):
-        """Buduje interfejs lekarza."""
-        # A. Pasek boczny
+
         self.setup_sidebar_widgets()
 
-        # B. Tabele (Główna treść)
         self.setup_doctor_tables()
 
-        # C. Layout
         self.main_h_layout.addWidget(self.side_panel)
         self.main_h_layout.addWidget(self.main_content_frame)
         self.setLayout(self.main_h_layout)
 
-        # D. Dane (Pobierz wizyty)
         self.refresh_list()
 
     def get_doctor_login(self):
@@ -166,7 +156,6 @@ class DoctorWindow(BaseWindow):
             return "MEDYCYNY"
 
     def setup_doctor_tables(self):
-        # 1. PACJENT (Ukryta na start)
         self.lbl_patient = QLabel("KARTA PACJENTA", self.main_content_frame)
         self.lbl_patient.setStyleSheet("color: #8E44AD; font-size: 18px; font-weight: bold; margin-bottom: 5px;")
         self.lbl_patient.setVisible(False)
@@ -183,7 +172,6 @@ class DoctorWindow(BaseWindow):
         self.list_patient.setVisible(False)
         self.main_v_layout.addWidget(self.list_patient)
 
-        # 2. DZISIAJ
         lbl_today = QLabel("WIZYTY DZISIAJ", self.main_content_frame)
         lbl_today.setStyleSheet(
             "color: #E74C3C; font-size: 18px; font-weight: bold; margin-bottom: 5px; margin-top: 15px;")
@@ -199,7 +187,6 @@ class DoctorWindow(BaseWindow):
         self.list_today.itemClicked.connect(lambda item: self.handle_list_click(item, "today"))
         self.main_v_layout.addWidget(self.list_today)
 
-        # 3. PRZYSZŁOŚĆ
         lbl_future = QLabel("NADCHODZĄCE WIZYTY", self.main_content_frame)
         lbl_future.setStyleSheet(
             "color: #3498DB; font-size: 18px; font-weight: bold; margin-bottom: 5px; margin-top: 15px;")
@@ -215,17 +202,14 @@ class DoctorWindow(BaseWindow):
         self.list_future.itemClicked.connect(lambda item: self.handle_list_click(item, "future"))
         self.main_v_layout.addWidget(self.list_future)
 
-        # Ważne: Rozciąganie list
         self.main_v_layout.setStretchFactor(self.list_patient, 1)
         self.main_v_layout.setStretchFactor(self.list_today, 1)
         self.main_v_layout.setStretchFactor(self.list_future, 1)
 
     def setup_sidebar_widgets(self):
-        """Nowy, uporządkowany pasek boczny."""
         doc_name = self.get_doctor_login()
         self.setup_info_widget(f"DR {doc_name}", f"ID: {self.user_id}")
 
-        # Panel wyszukiwania pacjenta
         search_frame = QFrame(self)
         search_frame.setFixedHeight(150)
         search_frame.setStyleSheet("""
@@ -268,10 +252,8 @@ class DoctorWindow(BaseWindow):
         layout.addWidget(search_btn)
         self.side_layout.addWidget(search_frame)
 
-        # --- SEKCJA PRZYCISKÓW AKCJI (Uporządkowana) ---
         self.side_layout.addSpacing(15)
 
-        # Linia oddzielająca
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet("color: #5D6D7E;")
@@ -281,7 +263,6 @@ class DoctorWindow(BaseWindow):
                           styleSheet="color: #BDC3C7; font-size: 11px; font-weight: bold; margin-top: 10px; margin-bottom: 5px; border:none;")
         self.side_layout.addWidget(lbl_menu)
 
-        # Definicja stylu dla małych przycisków
         btn_style = """
             QPushButton { 
                 background-color: #34495E; 
@@ -297,7 +278,6 @@ class DoctorWindow(BaseWindow):
             QPushButton:hover { background-color: #415B76; }
         """
 
-        # Funkcja pomocnicza
         def add_menu_btn(text, func):
             btn = QPushButton(text)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -306,7 +286,6 @@ class DoctorWindow(BaseWindow):
             self.side_layout.addWidget(btn)
             self.side_layout.addSpacing(2)
 
-        # Dodajemy przyciski w logicznej kolejności
         add_menu_btn("MOJE WIZYTY", self.reset_to_my_schedule)
         add_menu_btn("ZOBACZ KARTĘ", self._show_visit_details)
         add_menu_btn("DODAJ ZALECENIA", self.open_add_recommendations)
@@ -314,7 +293,6 @@ class DoctorWindow(BaseWindow):
 
         self.side_layout.addStretch(1)
 
-        # Wyloguj na dole
         wyloguj_btn = QPushButton("WYLOGUJ")
         wyloguj_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         wyloguj_btn.setFixedHeight(45)
@@ -326,7 +304,6 @@ class DoctorWindow(BaseWindow):
         self.side_layout.addWidget(wyloguj_btn)
 
     def reset_to_my_schedule(self):
-        """Ukrywa sekcję pacjenta i pokazuje harmonogram lekarza."""
         self.lbl_patient.setVisible(False)
         self.header_patient.setVisible(False)
         self.list_patient.setVisible(False)
