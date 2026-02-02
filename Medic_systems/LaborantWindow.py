@@ -2,223 +2,198 @@ import psycopg2
 from datetime import datetime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame, QTextEdit,
-                               QListWidgetItem, QHBoxLayout)
+                               QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
-from BaseWindow import BaseWindow, conn_str
+from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
 
-# --- OKNO WPISYWANIA WYNIKÓW ---
-class FillLabResultWindow(QDialog):
-    def __init__(self, test_id, test_title, parent=None):
+# --- OKNO EDYCJI WYNIKU ---
+class EditResultWindow(QDialog):
+    def __init__(self, test_id, test_name, parent=None):
         super().__init__(parent)
         self.test_id = test_id
-        self.setWindowTitle(f"Wynik badania: {test_title}")
-        self.resize(500, 450)
-
-        # Stylizacja
-        self.setStyleSheet("""
-            QDialog { background-color: #F8F9FA; }
-            QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
-            QTextEdit { 
-                background-color: white; 
-                color: #2C3E50; 
-                border: 1px solid #BDC3C7; 
-                border-radius: 4px; 
-                padding: 10px;
-                font-size: 13px;
-            }
-            QTextEdit:focus { border: 2px solid #3498DB; }
-        """)
+        self.setWindowTitle(f"Wynik")
+        self.resize(500, 350)
+        self.setStyleSheet(DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(25, 25, 25, 25)
 
-        header = QLabel("Wprowadzanie Wyników")
-        header.setStyleSheet("color: #2C3E50; font-size: 18px; border: none; margin-bottom: 5px;")
-        layout.addWidget(header)
+        layout.addWidget(QLabel(f"BADANIE: {test_name}", styleSheet="font-size: 16px; color: #2980B9;"))
+        layout.addWidget(QLabel("Wpisz wynik badania:"))
 
-        info_lbl = QLabel(f"BADANIE: {test_title}")
-        info_lbl.setStyleSheet(
-            "font-size: 14px; color: #2980B9; border-bottom: 1px solid #BDC3C7; padding-bottom: 10px;")
-        layout.addWidget(info_lbl)
+        self.desc_edit = QTextEdit()
+        self.desc_edit.setPlaceholderText("Wpisz tutaj parametry...")
+        layout.addWidget(self.desc_edit)
 
-        layout.addWidget(QLabel("Opis wyników / Parametry:"))
-
-        self.result_edit = QTextEdit()
-        self.result_edit.setPlaceholderText("Wpisz tutaj szczegółowe wyniki badania...")
-        layout.addWidget(self.result_edit)
-
-        btn = QPushButton("ZAPISZ WYNIK")
+        btn = QPushButton("ZAPISZ I ZAKOŃCZ")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(50)
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27AE60; 
-                color: white; 
-                font-weight: bold; 
-                border-radius: 5px; 
-                font-size: 14px;
-                border: none;
-            }
-            QPushButton:hover { background-color: #2ECC71; }
-        """)
+        btn.setStyleSheet(
+            "background-color: #27AE60; color: white; font-weight: bold; border-radius: 5px; padding: 10px;")
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
     def save(self):
-        description = self.result_edit.toPlainText().strip()
-
-        if not description:
-            QMessageBox.warning(self, "Błąd", "Pole wyników nie może być puste.")
-            return
+        text = self.desc_edit.toPlainText().strip()
+        if not text: return
 
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
-
-            # Aktualizujemy rekord w tabeli lab_tests
-            cursor.execute("UPDATE lab_tests SET description = %s WHERE id = %s",
-                           (description, self.test_id))
-
+            cursor.execute("UPDATE lab_tests SET description = %s WHERE id = %s", (text, self.test_id))
             conn.commit()
             conn.close()
-
-            QMessageBox.information(self, "Sukces", "Wynik badania został zapisany.")
+            QMessageBox.information(self, "Sukces", "Wynik zapisany.")
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Błąd Bazy", str(e))
+            QMessageBox.critical(self, "Błąd", str(e))
 
 
 # --- GŁÓWNE OKNO LABORANTA ---
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
+        # 1. Tworzymy puste okno bazowe
         super().__init__(user_id, "Laborant")
-        self.init_ui()
 
-    def setup_sidebar_widgets(self):
-        self.setup_info_widget("LABORATORIUM", f"ID: {self.user_id}")
+        # 2. Budujemy interfejs Laboranta ręcznie
+        self.build_lab_ui()
 
-        info_frame = QFrame(self)
-        info_frame.setStyleSheet("""
-            QFrame { background-color: #34495E; border: 1px solid #415B76; border-radius: 8px; }
-            QLabel { color: #ECF0F1; }
-        """)
-        layout = QVBoxLayout(info_frame)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(5)
+    def build_lab_ui(self):
+        # A. PASEK BOCZNY
+        self.setup_sidebar()
 
-        lbl = QLabel("STATUS PRACY:", info_frame)
-        lbl.setStyleSheet("color: #BDC3C7; font-size: 10px; font-weight: bold; border: none;")
+        # B. TREŚĆ GŁÓWNA (Lista Do Zrobienia)
+        self.main_v_layout.addWidget(QLabel("BADANIA DO WYKONANIA",
+                                            styleSheet="color: #E67E22; font-size: 20px; font-weight: bold; margin-bottom: 10px;"))
+        self.main_v_layout.addWidget(self.create_header_bar("PESEL"))
 
-        lbl2 = QLabel("WSZYSTKIE\nZLECENIA", info_frame)
-        lbl2.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl2.setStyleSheet("color: #2ECC71; font-weight: 800; font-size: 14px; border: none;")
+        self.list_todo = QListWidget()
+        self.list_todo.setStyleSheet("background: transparent; border: none;")
+        self.list_todo.itemClicked.connect(self.handle_click)
+        self.main_v_layout.addWidget(self.list_todo)
 
-        layout.addWidget(lbl)
-        layout.addWidget(lbl2)
-        self.side_layout.addWidget(info_frame)
-
-    def setup_extra_buttons(self):
-        self.add_button("ODŚWIEŻ LISTĘ").clicked.connect(self.reset_to_pending)
-        self.add_button("WPISZ WYNIKI").clicked.connect(self.open_fill_result)
-
-    def reset_to_pending(self):
+        # 3. Pobieramy dane
         self.refresh_list()
 
-    def get_sql_query(self):
-        # Pobieramy 4 kolumny: ID testu, Data wizyty, Tytuł testu, PESEL
-        # Łączymy tabele lab_tests i visits
-        return """
-            SELECT t.id, v.visit_date, t.title, v.pesel 
-            FROM lab_tests t
-            JOIN visits v ON t.visit_id = v.id
-            WHERE t.description IS NULL OR t.description = ''
-            ORDER BY v.visit_date DESC
-        """
+    def setup_sidebar(self):
+        name = "LABORANT"
+        if self.connection:
+            try:
+                c = self.connection.cursor()
+                c.execute("SELECT login FROM users WHERE id=%s", (self.user_id,))
+                r = c.fetchone()
+                if r: name = r[0].upper()
+            except:
+                pass
+
+        self.setup_info_widget(f"TECH. {name}", f"ID: {self.user_id}")
+
+        self.side_layout.addSpacing(20)
+
+        b1 = self.add_button("WPROWADŹ WYNIKI")
+        b1.setStyleSheet(
+            "background-color: #E67E22; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px;")
+        b1.clicked.connect(self.open_edit_result)
+
+        self.side_layout.addSpacing(10)
+
+        b2 = self.add_button("ZOBACZ KARTĘ")
+        b2.clicked.connect(self._show_visit_details)
+
+        self.side_layout.addStretch()
+        self.add_button("WYLOGUJ").clicked.connect(self._show_logout_window)
 
     def refresh_list(self):
+        """Pobiera tylko badania bez wyników."""
+        self.list_todo.clear()
         self.current_selected_frame = None
         self.current_selected_data = None
-        self.lista_wizyt.clear()
 
-        query = self.get_sql_query()
-        if not query or not self.connection: return
+        if not self.connection: return
 
         try:
             with self.connection.cursor() as cursor:
-                # Laborant widzi wszystko, nie filtrujemy po ID użytkownika, więc bez parametrów
+                # Pobieramy tylko te, gdzie description IS NULL
+                query = """
+                    SELECT t.id, v.visit_date, t.title, v.pesel, v.id
+                    FROM lab_tests t
+                    JOIN visits v ON t.visit_id = v.id
+                    WHERE t.description IS NULL
+                    ORDER BY v.visit_date ASC
+                """
                 cursor.execute(query)
-                rows = cursor.fetchall()
-                self.add_list_items(rows)
+                self.fill_list(self.list_todo, cursor.fetchall())
+
         except Exception as e:
             print(f"SQL Error: {e}")
-            QMessageBox.warning(self, "Błąd SQL", str(e))
 
-    # --- TO JEST FUNKCJA, KTÓREJ BRAKOWAŁO ---
-    def add_list_items(self, data_rows):
-        styles = ["background-color: #FFFFFF;", "background-color: #F8F9F9;"]
+    def fill_list(self, widget, rows):
+        bg_colors = ["#FFFFFF", "#F8F9F9"]
 
-        WIDTH_DATE = 140
-        WIDTH_PERSON = 150
+        for i, row in enumerate(rows):
+            # row: 0=test_id, 1=date, 2=test_title, 3=pesel, 4=visit_id
 
-        # Rozpakowujemy 4 wartości: TestID, Data, Tytuł, PESEL
-        for i, (tid, data, tytul, pesel) in enumerate(data_rows):
-            data_str = data.strftime("%Y-%m-%d %H:%M") if data else ""
-            pesel_str = str(pesel)
+            item = QListWidgetItem()
+            date_str = row[1].strftime("%Y-%m-%d")
 
-            list_item = QListWidgetItem()
-            # Dane dla okna szczegółów (kompatybilność)
-            list_item.setData(Qt.ItemDataRole.UserRole, (data_str, f"BADANIE: {tytul}", pesel_str))
+            # Dane dla BaseWindow (podgląd) oraz dla edycji
+            # (date_str, test_title, pesel, test_id, visit_id)
+            item_data = (date_str, f"Badanie: {row[2]}", str(row[3]), row[0], row[4])
+            item.setData(Qt.ItemDataRole.UserRole, item_data)
 
             frame = QFrame()
-            frame.setFixedHeight(65)
-            frame.setStyleSheet(f"{styles[i % 2]} border-bottom: 1px solid #E0E0E0; color: #2C3E50;")
-
-            # --- ZAPAMIĘTUJEMY ID BADANIA (do edycji) ---
-            frame.setProperty("test_id", tid)
-            frame.setProperty("test_title", tytul)
+            # Ustawiamy property, żeby BaseWindow mogło pobrać ID wizyty
+            frame.setProperty("visit_id", row[4])
+            frame.setFixedHeight(60)
+            frame.setStyleSheet(
+                f"background-color: {bg_colors[i % 2]}; border-bottom: 1px solid #E0E0E0; border-left: 5px solid #E67E22;")
 
             hl = QHBoxLayout(frame)
             hl.setContentsMargins(15, 0, 15, 0)
 
-            # Wyświetlamy 3 kolumny (ID jest ukryte)
-
-            # 1. Data
-            lbl_date = QLabel(data_str)
-            lbl_date.setFixedWidth(WIDTH_DATE)
-            lbl_date.setStyleSheet("border: none; color: #555; font-weight: bold;")
+            lbl_date = QLabel(date_str)
+            lbl_date.setFixedWidth(140)
+            lbl_date.setStyleSheet("color: #555; font-weight: bold; border:none;")
             hl.addWidget(lbl_date)
 
-            # 2. Tytuł badania (Kolor niebieski dla wyróżnienia)
-            lbl_title = QLabel(tytul.upper())
-            lbl_title.setStyleSheet("border: none; color: #2980B9; font-size: 13px; font-weight: bold;")
+            lbl_title = QLabel(row[2].upper())
+            lbl_title.setStyleSheet("color: #2C3E50; font-weight: bold; font-size: 13px; border:none;")
             hl.addWidget(lbl_title, stretch=1)
 
-            # 3. PESEL
-            lbl_pesel = QLabel(pesel_str)
-            lbl_pesel.setFixedWidth(WIDTH_PERSON)
-            lbl_pesel.setStyleSheet("border: none; color: #555;")
+            lbl_pesel = QLabel(str(row[3]))
+            lbl_pesel.setFixedWidth(150)
+            lbl_pesel.setStyleSheet("color: #555; border:none;")
             hl.addWidget(lbl_pesel)
 
-            self.lista_wizyt.addItem(list_item)
-            list_item.setSizeHint(QSize(0, 65))
-            self.lista_wizyt.setItemWidget(list_item, frame)
+            widget.addItem(item)
+            item.setSizeHint(QSize(0, 60))
+            widget.setItemWidget(item, frame)
 
-    def open_fill_result(self):
-        if not self.current_selected_frame:
-            QMessageBox.warning(self, "Uwaga", "Wybierz badanie z listy, aby wpisać wynik.")
+    def handle_click(self, item):
+        # Reset wszystkich teł
+        for i in range(self.list_todo.count()):
+            w = self.list_todo.itemWidget(self.list_todo.item(i))
+            if w: w.setStyleSheet(
+                "background-color: #FFFFFF; border-bottom: 1px solid #E0E0E0; border-left: 5px solid #E67E22;")
+
+        # Zapisz wybór
+        self.current_selected_frame = self.list_todo.itemWidget(item)
+        self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
+
+        # Podświetl
+        if self.current_selected_frame:
+            self.current_selected_frame.setStyleSheet(
+                "background-color: #EBF5FB; border-bottom: 1px solid #AED6F1; border-left: 5px solid #3498DB;")
+
+    def open_edit_result(self):
+        if not self.current_selected_data:
+            QMessageBox.warning(self, "Uwaga", "Najpierw wybierz badanie z listy.")
             return
 
-        # Pobieramy ukryte ID badania
-        test_id = self.current_selected_frame.property("test_id")
-        test_title = self.current_selected_frame.property("test_title")
+        # Dane: (date, test_title, pesel, test_id, visit_id)
+        test_id = self.current_selected_data[3]
+        test_title = self.current_selected_data[1]
 
-        if not test_id:
-            QMessageBox.critical(self, "Błąd", "Nie można zidentyfikować badania.")
-            return
-
-        # Otwieramy okno edycji
-        if FillLabResultWindow(test_id, test_title, self).exec():
-            # Po pomyślnym zapisie odświeżamy listę -> wykonane badanie zniknie z listy "Do zrobienia"
+        if EditResultWindow(test_id, test_title, self).exec():
             self.refresh_list()
