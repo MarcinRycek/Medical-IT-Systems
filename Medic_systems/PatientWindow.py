@@ -27,7 +27,7 @@ class BookVisitWindow(QDialog):
         self.setWindowTitle("Umów Wizytę")
         self.resize(520, 780)
 
-        # --- STYLE DLA KALENDARZA I KONTROLEK ---
+        # --- STYLE ---
         self.setStyleSheet("""
             QDialog { background-color: #F8F9FA; }
             QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
@@ -60,7 +60,7 @@ class BookVisitWindow(QDialog):
             QCalendarWidget QAbstractItemView:enabled {
                 color: #2C3E50;
                 background-color: white;
-                selection-background-color: #95A5A6; /* SZARE ZAZNACZENIE (Twoja zmiana) */
+                selection-background-color: #95A5A6; /* Szary po kliknięciu */
                 selection-color: white;
             }
         """)
@@ -71,6 +71,8 @@ class BookVisitWindow(QDialog):
 
         layout.addWidget(QLabel("1. Wybierz Lekarza:"))
         self.doctor_combo = QComboBox()
+        # Po zmianie lekarza odświeżamy kolory w kalendarzu
+        self.doctor_combo.currentIndexChanged.connect(self.on_doctor_changed)
         layout.addWidget(self.doctor_combo)
 
         layout.addWidget(QLabel("2. Wybierz Datę (Pn-Pt):"))
@@ -79,7 +81,7 @@ class BookVisitWindow(QDialog):
         self.calendar.setMinimumDate(QDate.currentDate())
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
 
-        # Obsługa klikania w kalendarz
+        # Kliknięcie w kalendarz
         self.calendar.selectionChanged.connect(self.refresh_time_slots)
         self._last_selected_qdate = None
         layout.addWidget(self.calendar)
@@ -112,15 +114,11 @@ class BookVisitWindow(QDialog):
         layout.addWidget(self.save_btn)
 
         self.load_doctors()
-        self.doctor_combo.currentIndexChanged.connect(self.refresh_time_slots)
-
-        # Wywołanie początkowe
-        self.refresh_time_slots()
+        # Inicjalne malowanie kalendarza dla pierwszego lekarza
+        self.on_doctor_changed()
 
     def _db_connect(self):
-        """Otwiera połączenie DB (NAPRAWIONA REKURENCJA)."""
         try:
-            # FIX: Używamy psycopg2.connect zamiast self._db_connect()
             c = psycopg2.connect(conn_str)
             with c.cursor() as cur:
                 cur.execute("SET TIME ZONE 'Europe/Warsaw'")
@@ -138,27 +136,82 @@ class BookVisitWindow(QDialog):
             cur.execute("SELECT login, id FROM users WHERE role IN ('Lekarz', 'lekarz', 'doctor')")
             doctors = cur.fetchall()
             conn.close()
+            # Blokujemy sygnały podczas ładowania, żeby nie odpalać refresh x razy
+            self.doctor_combo.blockSignals(True)
             for login, doc_id in doctors:
                 self.doctor_combo.addItem(f"Dr {login}", doc_id)
+            self.doctor_combo.blockSignals(False)
         except Exception as e:
             print(e)
 
-    def _apply_selected_date_gray(self):
-        """Nadaje wybranej dacie szary kolor."""
-        qdate = self.calendar.selectedDate()
-        if getattr(self, "_last_selected_qdate", None) and self._last_selected_qdate != qdate:
-            self.calendar.setDateTextFormat(self._last_selected_qdate, QTextCharFormat())
+    def on_doctor_changed(self):
+        """Obsługa zmiany lekarza: koloruje dni i odświeża sloty."""
+        self.highlight_unavailable_days()
+        self.refresh_time_slots()
 
-        fmt = QTextCharFormat()
-        fmt.setBackground(QBrush(QColor("#95A5A6")))  # Szary
-        fmt.setForeground(QBrush(QColor("white")))
-        self.calendar.setDateTextFormat(qdate, fmt)
+    def highlight_unavailable_days(self):
+        """Koloruje dni, w które lekarz NIE pracuje, na jasnoczerwono."""
+        # 1. Reset formatowania
+        self.calendar.setDateTextFormat(QDate(), QTextCharFormat())
+
+        doc_id = self.doctor_combo.currentData()
+        if not doc_id: return
+
+        working_days = set()
+
+        conn = self._db_connect()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT day_of_week FROM doctor_schedules WHERE doctor_id=%s", (doc_id,))
+                rows = cur.fetchall()
+                for r in rows:
+                    working_days.add(r[0])  # 0=Pon, 6=Nd (format bazy)
+                conn.close()
+            except:
+                pass
+
+        # Jeśli lekarz nie ma ustawionego grafiku, zakładamy że nie pracuje wcale (pusty zbiór)
+        # Format dla dni wolnych (czerwony)
+        fmt_unavailable = QTextCharFormat()
+        fmt_unavailable.setBackground(QBrush(QColor("#FDEDEC")))  # Bardzo jasny czerwony
+        fmt_unavailable.setForeground(QBrush(QColor("#C0392B")))  # Ciemniejszy czerwony tekst
+
+        # 2. Iterujemy przez najbliższe 60 dni i kolorujemy
+        today = QDate.currentDate()
+        for i in range(60):
+            check_date = today.addDays(i)
+            # PySide dayOfWeek: 1=Pon...7=Nd
+            # Baza day_of_week: 0=Pon...6=Nd
+            db_day = check_date.dayOfWeek() - 1
+
+            if db_day not in working_days:
+                self.calendar.setDateTextFormat(check_date, fmt_unavailable)
+
+    def _apply_selected_date_gray(self):
+        """Nadaje wybranej dacie szary kolor (nadpisując czerwony jeśli trzeba)."""
+        qdate = self.calendar.selectedDate()
+
+        # Format szary (aktywny wybór)
+        fmt_selected = QTextCharFormat()
+        fmt_selected.setBackground(QBrush(QColor("#95A5A6")))
+        fmt_selected.setForeground(QBrush(QColor("white")))
+
+        # Jeśli zmieniliśmy datę, musimy przywrócić format "starej" daty
+        # (czy była czerwona czy biała)
+        if getattr(self, "_last_selected_qdate", None) and self._last_selected_qdate != qdate:
+            # Najprościej: ponownie uruchomić logikę kolorowania dla całego kalendarza,
+            # to przywróci czerwone tło tam gdzie trzeba.
+            self.highlight_unavailable_days()
+
+        self.calendar.setDateTextFormat(qdate, fmt_selected)
         self._last_selected_qdate = qdate
 
     def refresh_time_slots(self, *_):
+        # Najpierw kolorujemy wybraną datę
         self._apply_selected_date_gray()
 
-        # Czyszczenie
+        # Czyszczenie slotów
         for i in reversed(range(self.time_slots_layout.count())):
             w = self.time_slots_layout.itemAt(i).widget()
             if w: w.setParent(None)
@@ -175,17 +228,16 @@ class BookVisitWindow(QDialog):
 
         # Obsługa grafiku Admina
         day_of_week = sel_date.weekday()
-        start_h, end_h = 8, 18  # Domyślne wartości (gdyby nie było grafiku)
-        is_working_day = True  # Domyślnie zakładamy że pracuje, chyba że baza powie inaczej
+        start_h, end_h = 8, 18
+        is_working_day = True
 
-        # Pobieranie grafiku i zajętych godzin
         taken = []
         conn = self._db_connect()
         if conn:
             try:
                 cur = conn.cursor()
 
-                # 1. Sprawdź godziny pracy lekarza
+                # 1. Grafik
                 cur.execute("SELECT start_time, end_time FROM doctor_schedules WHERE doctor_id=%s AND day_of_week=%s",
                             (doc_id, day_of_week))
                 schedule = cur.fetchone()
@@ -193,14 +245,12 @@ class BookVisitWindow(QDialog):
                     start_h = schedule[0].hour
                     end_h = schedule[1].hour
                 else:
-                    # Jeśli tabela istnieje, ale nie ma wpisu -> lekarz nie pracuje
-                    # Sprawdźmy czy w ogóle tabela ma jakiekolwiek wpisy dla tego lekarza
+                    # Sprawdź czy lekarz w ogóle ma grafik
                     cur.execute("SELECT 1 FROM doctor_schedules WHERE doctor_id=%s LIMIT 1", (doc_id,))
                     if cur.fetchone():
-                        # Lekarz ma grafik, ale nie w ten dzień -> wolne
-                        is_working_day = False
+                        is_working_day = False  # Ma grafik, ale nie dziś
 
-                # 2. Pobierz zajęte wizyty
+                # 2. Zajęte
                 cur.execute(
                     "SELECT EXTRACT(HOUR FROM visit_date), EXTRACT(MINUTE FROM visit_date) FROM visits WHERE doctor_id=%s AND DATE(visit_date)=%s",
                     (doc_id, sel_date))
@@ -219,7 +269,6 @@ class BookVisitWindow(QDialog):
         row, col = 0, 0
         now = datetime.now()
 
-        # Generowanie przycisków w zakresie godzin pracy
         for h in range(start_h, end_h):
             for m in [0, 30]:
                 ts = f"{h:02d}:{m:02d}"
@@ -245,7 +294,7 @@ class BookVisitWindow(QDialog):
 
                 self.time_slots_layout.addWidget(btn, row, col)
                 col += 1
-                if col > 3:  # 4 kolumny
+                if col > 3:
                     col = 0
                     row += 1
 
@@ -272,13 +321,10 @@ class BookVisitWindow(QDialog):
         d_str = f"{q_date.year()}-{q_date.month():02d}-{q_date.day():02d} {self.selected_time}"
 
         try:
-            # Konwersja na string dla bazy (bezpieczniejsza niż obiekty datetime przy różnych strefach)
             vd_naive = datetime.strptime(d_str, "%Y-%m-%d %H:%M")
-
             conn = self._db_connect()
             cur = conn.cursor()
 
-            # Walidacja zajętości
             cur.execute("SELECT 1 FROM visits WHERE doctor_id=%s AND visit_date=%s LIMIT 1", (doc_id, vd_naive))
             if cur.fetchone():
                 conn.close()
@@ -371,7 +417,7 @@ class PatientWindow(BaseWindow):
         btn_det.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_det.setFixedHeight(45)
         btn_det.setStyleSheet("""
-            QPushButton { background: #3498DB; color: white; font-weight: bold; border-radius: 6px; border:none; }
+            QPushButton { background: #34495E; color: white; font-weight: bold; border-radius: 6px; border:none; }
             QPushButton:hover { background-color: #415B76; }
         """)
         btn_det.clicked.connect(self._show_visit_details)
@@ -380,7 +426,6 @@ class PatientWindow(BaseWindow):
         self.refresh_list()
 
     def _db_connect(self):
-        """Otwiera połączenie (naprawione)."""
         try:
             c = psycopg2.connect(conn_str)
             return c
@@ -390,13 +435,11 @@ class PatientWindow(BaseWindow):
     def _normalize_visit_dt(self, value):
         if not value: return None
         tz = LOCAL_TZ
-        # Obsługa różnych formatów z bazy
         if isinstance(value, datetime):
             if value.tzinfo is None and tz: return value.replace(tzinfo=tz)
             return value
         if isinstance(value, str):
             try:
-                # Uproszczone parsowanie
                 return datetime.fromisoformat(value.replace(" ", "T"))
             except:
                 try:
@@ -418,7 +461,7 @@ class PatientWindow(BaseWindow):
         if LOCAL_TZ:
             now = now.astimezone(LOCAL_TZ)
         else:
-            now = now.replace(tzinfo=None)  # Fallback
+            now = now.replace(tzinfo=None)
 
         try:
             cur = conn.cursor()
@@ -435,7 +478,6 @@ class PatientWindow(BaseWindow):
                 vd = self._normalize_visit_dt(row[1])
                 if not vd: continue
 
-                # Porównanie w tej samej strefie (lub obu naiwnych)
                 vd_naive = vd.replace(tzinfo=None)
                 now_naive = now.replace(tzinfo=None)
 
