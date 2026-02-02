@@ -3,7 +3,6 @@ import bcrypt
 from PySide6.QtWidgets import (QWidget, QLineEdit, QPushButton, QVBoxLayout,
                                QMessageBox, QLabel, QComboBox, QFrame)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCursor
 from BaseWindow import conn_str
 
 

@@ -33,7 +33,7 @@ class VisitDetailsWindow(QDialog):
         f.setStyleSheet("background: white; border: 1px solid #ddd; border-radius: 5px;")
         vl = QVBoxLayout(f)
         vl.addWidget(QLabel(f"Data: {d}", styleSheet="color: #555; border:none;"))
-        vl.addWidget(QLabel(f"Pacjent/Osoba: {o}", styleSheet="color: #555; border:none;"))
+        vl.addWidget(QLabel(f"Doktor: {o}", styleSheet="color: #555; border:none;"))
         l.addWidget(f)
 
         l.addSpacing(10)

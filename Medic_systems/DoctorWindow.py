@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame, QTextEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
-from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
+from BaseWindow import BaseWindow, conn_str
 
 LOCAL_DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }

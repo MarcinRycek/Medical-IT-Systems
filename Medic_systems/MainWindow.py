@@ -1,5 +1,5 @@
 import psycopg2
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QListWidget, QSizePolicy, \
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QListWidget, \
     QListWidgetItem, QDialog, QMessageBox, QLineEdit
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette, qRgb
@@ -110,7 +110,6 @@ class MainWindow(QWidget):
         side_layout.setSpacing(40)
         side_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         side_layout.setContentsMargins(20, 150, 20, 20)
-        # ===== KOD PACJENTA =====
         patient_code = self.fetch_patient_code()
         code_text = str(patient_code) if patient_code else "------"
 
@@ -143,7 +142,6 @@ class MainWindow(QWidget):
 
         side_layout.addWidget(code_frame, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # ===== PRZYCISK =====
         zobacz_wizyte_btn = self.add_button(side_layout, "zobacz wizytę")
         dodaj_wizyte_btn = self.add_button(side_layout, "dodaj nową wizytę")
         wyloguj_btn = self.add_button(side_layout, "wyloguj")

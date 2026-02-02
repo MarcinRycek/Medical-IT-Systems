@@ -1,5 +1,4 @@
 import random
-import re
 import psycopg2
 from functools import partial
 from datetime import datetime, timedelta, time, date
@@ -12,10 +11,10 @@ except:
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QFrame, QPushButton,
                                QMessageBox, QListWidgetItem, QHBoxLayout, QScrollArea,
                                QWidget, QLineEdit, QComboBox, QCalendarWidget,
-                               QGridLayout, QTableView, QTextEdit, QListWidget)
+                               QGridLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize, QDate
-from PySide6.QtGui import QBrush, QColor, QPalette, QTextCharFormat
-from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
+from PySide6.QtGui import QBrush, QColor, QTextCharFormat
+from BaseWindow import BaseWindow, conn_str
 
 
 class BookVisitWindow(QDialog):
