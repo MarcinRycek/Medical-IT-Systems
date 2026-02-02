@@ -29,8 +29,11 @@ class EditResultWindow(QDialog):
 
         btn = QPushButton("ZAPISZ I ZAKOŃCZ")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet(
-            "background-color: #27AE60; color: white; font-weight: bold; border-radius: 5px; padding: 10px;")
+        # --- ZMIANA: Dodano efekt HOVER ---
+        btn.setStyleSheet("""
+            QPushButton { background-color: #27AE60; color: white; font-weight: bold; border-radius: 5px; padding: 10px; border: none; }
+            QPushButton:hover { background-color: #2ECC71; }
+        """)
         btn.clicked.connect(self.save)
         layout.addWidget(btn)
 
@@ -53,17 +56,12 @@ class EditResultWindow(QDialog):
 # --- GŁÓWNE OKNO LABORANTA ---
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
-        # 1. Tworzymy puste okno bazowe
         super().__init__(user_id, "Laborant")
-
-        # 2. Budujemy interfejs Laboranta ręcznie
         self.build_lab_ui()
 
     def build_lab_ui(self):
-        # A. PASEK BOCZNY
         self.setup_sidebar()
 
-        # B. TREŚĆ GŁÓWNA (Lista Do Zrobienia)
         self.main_v_layout.addWidget(QLabel("BADANIA DO WYKONANIA",
                                             styleSheet="color: #E67E22; font-size: 20px; font-weight: bold; margin-bottom: 10px;"))
         self.main_v_layout.addWidget(self.create_header_bar("PESEL"))
@@ -73,7 +71,6 @@ class LaborantWindow(BaseWindow):
         self.list_todo.itemClicked.connect(self.handle_click)
         self.main_v_layout.addWidget(self.list_todo)
 
-        # 3. Pobieramy dane
         self.refresh_list()
 
     def setup_sidebar(self):
@@ -91,21 +88,36 @@ class LaborantWindow(BaseWindow):
 
         self.side_layout.addSpacing(20)
 
+        # --- ZMIANA: Dodano style HOVER do przycisków ---
+        btn_style = """
+            QPushButton { background-color: #E67E22; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px; border: none; }
+            QPushButton:hover { background-color: #D35400; }
+        """
+
         b1 = self.add_button("WPROWADŹ WYNIKI")
-        b1.setStyleSheet(
-            "background-color: #E67E22; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px;")
+        b1.setStyleSheet(btn_style)
         b1.clicked.connect(self.open_edit_result)
 
         self.side_layout.addSpacing(10)
 
         b2 = self.add_button("ZOBACZ KARTĘ")
+        # Nadajemy styl również tutaj, aby był spójny
+        b2.setStyleSheet("""
+            QPushButton { background-color: #34495E; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px; border: none; }
+            QPushButton:hover { background-color: #415B76; }
+        """)
         b2.clicked.connect(self._show_visit_details)
 
         self.side_layout.addStretch()
-        self.add_button("WYLOGUJ").clicked.connect(self._show_logout_window)
+
+        wyloguj = self.add_button("WYLOGUJ")
+        wyloguj.setStyleSheet("""
+            QPushButton { background-color: #C0392B; color: white; border-radius: 6px; padding: 15px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} 
+            QPushButton:hover { background-color: #E74C3C; }
+        """)
+        wyloguj.clicked.connect(self._show_logout_window)
 
     def refresh_list(self):
-        """Pobiera tylko badania bez wyników."""
         self.list_todo.clear()
         self.current_selected_frame = None
         self.current_selected_data = None
@@ -114,7 +126,6 @@ class LaborantWindow(BaseWindow):
 
         try:
             with self.connection.cursor() as cursor:
-                # Pobieramy tylko te, gdzie description IS NULL
                 query = """
                     SELECT t.id, v.visit_date, t.title, v.pesel, v.id
                     FROM lab_tests t
@@ -132,18 +143,13 @@ class LaborantWindow(BaseWindow):
         bg_colors = ["#FFFFFF", "#F8F9F9"]
 
         for i, row in enumerate(rows):
-            # row: 0=test_id, 1=date, 2=test_title, 3=pesel, 4=visit_id
-
             item = QListWidgetItem()
             date_str = row[1].strftime("%Y-%m-%d")
 
-            # Dane dla BaseWindow (podgląd) oraz dla edycji
-            # (date_str, test_title, pesel, test_id, visit_id)
             item_data = (date_str, f"Badanie: {row[2]}", str(row[3]), row[0], row[4])
             item.setData(Qt.ItemDataRole.UserRole, item_data)
 
             frame = QFrame()
-            # Ustawiamy property, żeby BaseWindow mogło pobrać ID wizyty
             frame.setProperty("visit_id", row[4])
             frame.setFixedHeight(60)
             frame.setStyleSheet(
@@ -171,17 +177,14 @@ class LaborantWindow(BaseWindow):
             widget.setItemWidget(item, frame)
 
     def handle_click(self, item):
-        # Reset wszystkich teł
         for i in range(self.list_todo.count()):
             w = self.list_todo.itemWidget(self.list_todo.item(i))
             if w: w.setStyleSheet(
                 "background-color: #FFFFFF; border-bottom: 1px solid #E0E0E0; border-left: 5px solid #E67E22;")
 
-        # Zapisz wybór
         self.current_selected_frame = self.list_todo.itemWidget(item)
         self.current_selected_data = item.data(Qt.ItemDataRole.UserRole)
 
-        # Podświetl
         if self.current_selected_frame:
             self.current_selected_frame.setStyleSheet(
                 "background-color: #EBF5FB; border-bottom: 1px solid #AED6F1; border-left: 5px solid #3498DB;")
@@ -191,7 +194,6 @@ class LaborantWindow(BaseWindow):
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz badanie z listy.")
             return
 
-        # Dane: (date, test_title, pesel, test_id, visit_id)
         test_id = self.current_selected_data[3]
         test_title = self.current_selected_data[1]
 

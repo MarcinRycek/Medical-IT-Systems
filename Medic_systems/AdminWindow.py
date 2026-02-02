@@ -5,42 +5,51 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QFrame, QPushButton
 from PySide6.QtCore import Qt, QSize, QTime
 from BaseWindow import BaseWindow, conn_str
 
-# Mapowanie dni tygodnia
-DAYS_MAP = {
-    0: "Poniedziałek",
-    1: "Wtorek",
-    2: "Środa",
-    3: "Czwartek",
-    4: "Piątek",
-    5: "Sobota",
-    6: "Niedziela"
-}
+DAYS_MAP = {0: "Poniedziałek", 1: "Wtorek", 2: "Środa", 3: "Czwartek", 4: "Piątek", 5: "Sobota", 6: "Niedziela"}
 
+
+# --- NOWA KLASA: KLIKALNA KARTA ---
+class ClickableCard(QFrame):
+    """Ramka, która po kliknięciu przełącza powiązany z nią checkbox."""
+
+    def __init__(self, checkbox, parent=None):
+        super().__init__(parent)
+        self.checkbox = checkbox
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(80)
+        self.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 6px;")
+
+    def mousePressEvent(self, event):
+        # Przełączamy checkbox tylko lewym przyciskiem myszy
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.checkbox.setChecked(not self.checkbox.isChecked())
+        super().mousePressEvent(event)
+
+
+# ----------------------------------
 
 class AdminWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Administrator")
         self.selected_doctor_id = None
         self.day_widgets = {}
-
         self.init_ui()
 
     def init_ui(self):
-        # --- 1. PASEK BOCZNY ---
         self.setup_sidebar()
 
-        # --- 2. GŁÓWNA TREŚĆ ---
-        self.header_lbl = QLabel("ZARZĄDZANIE GRAFIKIEM", self.main_content_frame)
-        self.header_lbl.setStyleSheet("color: #2C3E50; font-size: 22px; font-weight: bold; margin-bottom: 10px;")
-        self.main_v_layout.addWidget(self.header_lbl)
+        main_content_layout = QHBoxLayout()
 
-        self.sub_header = QLabel(
-            "1. Wybierz lekarza z listy.\n2. Zaznacz dni pracy (checkbox).\n3. Ustaw godziny i kliknij ZAPISZ.",
-            self.main_content_frame)
-        self.sub_header.setStyleSheet("color: #7F8C8D; font-size: 13px; margin-bottom: 15px;")
-        self.main_v_layout.addWidget(self.sub_header)
+        # --- LEWA STRONA: GRAFIK ---
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 10, 0)
 
-        # ScrollArea
+        left_layout.addWidget(
+            QLabel("ZARZĄDZANIE GRAFIKIEM", styleSheet="color: #2C3E50; font-size: 18px; font-weight: bold;"))
+        self.sub_header = QLabel("Wybierz lekarza z paska bocznego.", styleSheet="color: #7F8C8D; margin-bottom: 10px;")
+        left_layout.addWidget(self.sub_header)
+
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -49,53 +58,62 @@ class AdminWindow(BaseWindow):
         self.schedule_container = QWidget()
         self.schedule_layout = QVBoxLayout(self.schedule_container)
         self.schedule_layout.setSpacing(10)
-        self.schedule_layout.setContentsMargins(5, 5, 20, 5)
-
         self.scroll.setWidget(self.schedule_container)
-        self.main_v_layout.addWidget(self.scroll)
+        left_layout.addWidget(self.scroll)
 
-        # Generujemy wiersze (0-4 dla Pn-Pt)
         self.create_day_rows()
 
-        # Przycisk Zapisz
         self.save_btn = QPushButton("ZAPISZ GRAFIK")
         self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.save_btn.setFixedHeight(50)
+        self.save_btn.setFixedHeight(45)
         self.save_btn.setStyleSheet("""
-            QPushButton { 
-                background-color: #27AE60; 
-                color: white; 
-                font-weight: bold; 
-                font-size: 14px; 
-                border-radius: 8px; 
-                border: none;
-            }
-            QPushButton:hover { background-color: #2ECC71; }
+            QPushButton { background-color: #27AE60; color: white; font-weight: bold; border-radius: 5px; border:none; } 
+            QPushButton:hover { background-color: #2ECC71; } 
             QPushButton:disabled { background-color: #BDC3C7; }
         """)
         self.save_btn.clicked.connect(self.save_schedule)
         self.save_btn.setEnabled(False)
-        self.main_v_layout.addWidget(self.save_btn)
+        left_layout.addWidget(self.save_btn)
+
+        main_content_layout.addWidget(left_container, stretch=3)
+
+        # --- PRAWA STRONA: ZATWIERDZANIE ---
+        right_container = QFrame()
+        right_container.setStyleSheet("background-color: white; border-radius: 8px; border: 1px solid #BDC3C7;")
+        right_layout = QVBoxLayout(right_container)
+
+        right_layout.addWidget(QLabel("OCZEKUJĄCE REJESTRACJE",
+                                      styleSheet="color: #E67E22; font-weight: bold; font-size: 14px; border:none;"))
+
+        self.pending_list = QListWidget()
+        self.pending_list.setStyleSheet("border: none;")
+        right_layout.addWidget(self.pending_list)
+
+        btn_refresh = QPushButton("Odśwież")
+        btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_refresh.clicked.connect(self.refresh_pending_users)
+        btn_refresh.setStyleSheet("""
+            QPushButton { background: #ECF0F1; border: none; padding: 5px; color: #555; border-radius: 4px;}
+            QPushButton:hover { background: #D0D3D4; }
+        """)
+        right_layout.addWidget(btn_refresh)
+
+        main_content_layout.addWidget(right_container, stretch=2)
+
+        self.main_v_layout.addLayout(main_content_layout)
 
         self.refresh_doctors_list()
+        self.refresh_pending_users()
 
     def setup_sidebar(self):
-        self.setup_info_widget("ADMINISTRATOR", f"ID: {self.user_id}")
-
-        self.side_layout.addWidget(QLabel("LEKARZE:",
-                                          styleSheet="color: #BDC3C7; font-weight: bold; margin-top: 20px; margin-bottom: 5px; font-size: 12px;"))
-
+        self.setup_info_widget("ADMIN", f"ID: {self.user_id}")
+        self.side_layout.addWidget(QLabel("LEKARZE (DO GRAFIKU):",
+                                          styleSheet="color: #BDC3C7; font-weight: bold; margin-top: 20px; font-size: 11px;"))
         self.doctors_list = QListWidget()
-        self.doctors_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.doctors_list.setStyleSheet("""
-            QListWidget { background: transparent; border: none; outline: none; }
-            QListWidget::item { color: #ECF0F1; padding: 12px; border-bottom: 1px solid #34495E; margin-bottom: 2px; border-radius: 4px; }
-            QListWidget::item:selected { background-color: #3498DB; color: white; font-weight: bold; }
-            QListWidget::item:hover:!selected { background-color: #34495E; }
-        """)
+        self.doctors_list.setStyleSheet(
+            "QListWidget { background: transparent; border: none; outline: none; } QListWidget::item { color: #ECF0F1; padding: 10px; border-bottom: 1px solid #34495E; } QListWidget::item:selected { background-color: #3498DB; }")
         self.doctors_list.itemClicked.connect(self.load_schedule_for_doctor)
         self.side_layout.addWidget(self.doctors_list)
-
         self.side_layout.addStretch()
 
         wyloguj = self.add_button("WYLOGUJ")
@@ -106,176 +124,169 @@ class AdminWindow(BaseWindow):
         wyloguj.clicked.connect(self._show_logout_window)
 
     def create_day_rows(self):
-        """Generuje wiersze (karty) dla dni tygodnia."""
-        for day_idx in range(0, 5):  # 0=Pon, 4=Pt
-
-            card = QFrame()
-            card.setFixedHeight(80)
-            card.setStyleSheet("""
-                QFrame { background-color: white; border: 1px solid #E0E0E0; border-radius: 8px; }
-            """)
-
-            layout = QHBoxLayout(card)
-            layout.setContentsMargins(20, 10, 20, 10)
-            layout.setSpacing(15)
-
+        for day_idx in range(5):
             # Checkbox
             chk = QCheckBox(DAYS_MAP[day_idx])
-            chk.setStyleSheet("""
-                QCheckBox { font-weight: bold; font-size: 15px; color: #2C3E50; border: none; }
-                QCheckBox::indicator { width: 20px; height: 20px; }
-            """)
+            chk.setStyleSheet("font-weight: bold; color: #2C3E50; border: none; background: transparent;")
 
-            # Pola czasu
-            t_start = QTimeEdit()
+            # --- ZMIANA: Używamy ClickableCard zamiast QFrame ---
+            card = ClickableCard(chk)
+
+            hl = QHBoxLayout(card)
+            hl.setContentsMargins(15, 10, 15, 10)
+
+            t_start = QTimeEdit();
+            t_start.setTime(QTime(8, 0));
             t_start.setDisplayFormat("HH:mm")
-            t_start.setTime(QTime(8, 0))
-            t_start.setFixedWidth(110)
-            t_start.setFixedHeight(35)
-
-            lbl_to = QLabel("—")
-            lbl_to.setStyleSheet("border: none; color: #7F8C8D; font-weight: bold;")
-
-            t_end = QTimeEdit()
+            t_end = QTimeEdit();
+            t_end.setTime(QTime(16, 0));
             t_end.setDisplayFormat("HH:mm")
-            t_end.setTime(QTime(16, 0))
-            t_end.setFixedWidth(110)
-            t_end.setFixedHeight(35)
 
-            # Domyślnie wyłączone
-            t_start.setEnabled(False)
+            t_start.setEnabled(False);
             t_end.setEnabled(False)
-            self.apply_time_style(t_start, False)
+            self.apply_time_style(t_start, False);
             self.apply_time_style(t_end, False)
 
-            # Połączenie sygnału
-            chk.toggled.connect(lambda checked, s=t_start, e=t_end: self.on_day_toggled(checked, s, e))
+            # Lambda z domyślnymi argumentami, aby uniknąć problemów z pętlą
+            chk.toggled.connect(lambda c, s=t_start, e=t_end: self.on_day_toggled(c, s, e))
 
-            layout.addWidget(chk, stretch=1)
-            layout.addWidget(t_start)
-            layout.addWidget(lbl_to)
-            layout.addWidget(t_end)
+            hl.addWidget(chk, stretch=1)
+            hl.addWidget(t_start)
+            hl.addWidget(QLabel("-", styleSheet="border:none; background: transparent;"))
+            hl.addWidget(t_end)
 
             self.schedule_layout.addWidget(card)
+            self.day_widgets[day_idx] = {"check": chk, "start": t_start, "end": t_end}
 
-            self.day_widgets[day_idx] = {
-                "check": chk,
-                "start": t_start,
-                "end": t_end
-            }
+    def apply_time_style(self, w, e):
+        bg = "#FFFFFF" if e else "#F0F0F0"
+        col = "#2C3E50" if e else "#BDC3C7"
+        w.setStyleSheet(f"background-color: {bg}; color: {col}; border: 1px solid #BDC3C7; border-radius: 4px;")
 
-    def apply_time_style(self, widget, enabled):
-        if enabled:
-            widget.setStyleSheet("""
-                QTimeEdit { 
-                    background-color: #FFFFFF; 
-                    border: 2px solid #3498DB; 
-                    border-radius: 4px; 
-                    color: #2C3E50; 
-                    font-weight: bold; 
-                    padding-left: 10px; 
-                }
-            """)
-        else:
-            widget.setStyleSheet("""
-                QTimeEdit { 
-                    background-color: #F0F0F0; 
-                    border: 1px solid #D0D0D0; 
-                    border-radius: 4px; 
-                    color: #BDC3C7; 
-                    padding-left: 10px; 
-                }
-            """)
-
-    def on_day_toggled(self, checked, t_start, t_end):
-        """Obsługa kliknięcia w checkbox."""
-        t_start.setEnabled(checked)
-        t_end.setEnabled(checked)
-        self.apply_time_style(t_start, checked)
-        self.apply_time_style(t_end, checked)
+    def on_day_toggled(self, c, s, e):
+        s.setEnabled(c);
+        e.setEnabled(c)
+        self.apply_time_style(s, c);
+        self.apply_time_style(e, c)
 
     def refresh_doctors_list(self):
         self.doctors_list.clear()
         if not self.connection: return
-
         try:
-            with self.connection.cursor() as cur:
-                # Szukamy wszystkich wariacji roli 'lekarz'
-                cur.execute("""
-                    SELECT id, login 
-                    FROM users 
-                    WHERE LOWER(role) IN ('doctor', 'lekarz', 'doktor') 
-                    ORDER BY login
-                """)
-                rows = cur.fetchall()
-                for uid, login in rows:
-                    item = QListWidgetItem(f"Dr {login}")
-                    # uid może być teraz PESELem (string), co jest OK
-                    item.setData(Qt.ItemDataRole.UserRole, str(uid))
-                    self.doctors_list.addItem(item)
-        except Exception as e:
-            print(e)
+            with self.connection.cursor() as c:
+                c.execute("SELECT id, login FROM users WHERE LOWER(role) IN ('doctor','lekarz') ORDER BY login")
+                for uid, login in c.fetchall():
+                    it = QListWidgetItem(f"Dr {login}")
+                    it.setData(Qt.ItemDataRole.UserRole, str(uid))
+                    self.doctors_list.addItem(it)
+        except:
+            pass
 
     def load_schedule_for_doctor(self, item):
         self.selected_doctor_id = item.data(Qt.ItemDataRole.UserRole)
-        doc_name = item.text()
-
+        self.sub_header.setText(f"Edycja: {item.text()}")
         self.save_btn.setEnabled(True)
-        self.save_btn.setText(f"ZAPISZ GRAFIK ({doc_name})")
+        for w in self.day_widgets.values():
+            w["check"].setChecked(False)
+            w["start"].setTime(QTime(8, 0));
+            w["end"].setTime(QTime(16, 0))
 
-        # 1. Reset UI
-        for widgets in self.day_widgets.values():
-            widgets["check"].setChecked(False)  # To wyzwoli on_day_toggled(False)
-            widgets["start"].setTime(QTime(8, 0))
-            widgets["end"].setTime(QTime(16, 0))
-
-        if not self.connection: return
-
-        # 2. Pobierz z bazy
         try:
-            with self.connection.cursor() as cur:
-                cur.execute("""
-                    SELECT day_of_week, start_time, end_time 
-                    FROM doctor_schedules 
-                    WHERE doctor_id = %s
-                """, (self.selected_doctor_id,))
-
-                rows = cur.fetchall()
-                for day, start, end in rows:
-                    if day in self.day_widgets:
-                        w = self.day_widgets[day]
-                        w["start"].setTime(QTime(start.hour, start.minute))
-                        w["end"].setTime(QTime(end.hour, end.minute))
-                        w["check"].setChecked(True)  # To włączy style
-
-        except Exception as e:
-            QMessageBox.critical(self, "Błąd", str(e))
+            with self.connection.cursor() as c:
+                c.execute("SELECT day_of_week, start_time, end_time FROM doctor_schedules WHERE doctor_id=%s",
+                          (self.selected_doctor_id,))
+                for d, s, e in c.fetchall():
+                    if d in self.day_widgets:
+                        self.day_widgets[d]["start"].setTime(QTime(s.hour, s.minute))
+                        self.day_widgets[d]["end"].setTime(QTime(e.hour, e.minute))
+                        self.day_widgets[d]["check"].setChecked(True)
+        except:
+            pass
 
     def save_schedule(self):
         if not self.selected_doctor_id: return
-        if not self.connection: return
-
         try:
-            cur = self.connection.cursor()
-
-            # Usuwamy stary grafik dla tego lekarza
-            cur.execute("DELETE FROM doctor_schedules WHERE doctor_id = %s", (self.selected_doctor_id,))
-
-            count = 0
-            for day_idx, widgets in self.day_widgets.items():
-                if widgets["check"].isChecked():
-                    s_time = widgets["start"].time().toString("HH:mm")
-                    e_time = widgets["end"].time().toString("HH:mm")
-
-                    cur.execute("""
-                        INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time)
-                        VALUES (%s, %s, %s, %s)
-                    """, (self.selected_doctor_id, day_idx, s_time, e_time))
-                    count += 1
-
+            with self.connection.cursor() as c:
+                c.execute("DELETE FROM doctor_schedules WHERE doctor_id=%s", (self.selected_doctor_id,))
+                count = 0
+                for d, w in self.day_widgets.items():
+                    if w["check"].isChecked():
+                        c.execute(
+                            "INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time) VALUES (%s,%s,%s,%s)",
+                            (self.selected_doctor_id, d, w["start"].time().toString("HH:mm"),
+                             w["end"].time().toString("HH:mm")))
+                        count += 1
             self.connection.commit()
-            QMessageBox.information(self, "Sukces", f"Zapisano dni pracy: {count}")
-
+            QMessageBox.information(self, "OK", f"Zapisano dni pracy: {count}")
         except Exception as e:
-            self.connection.rollback()
             QMessageBox.critical(self, "Błąd", str(e))
+
+    def refresh_pending_users(self):
+        self.pending_list.clear()
+        if not self.connection: return
+        try:
+            with self.connection.cursor() as c:
+                c.execute("SELECT id, login, role FROM users WHERE is_active = FALSE")
+                rows = c.fetchall()
+                if not rows:
+                    self.pending_list.addItem(QListWidgetItem("Brak oczekujących."))
+                    return
+
+                for uid, login, role in rows:
+                    item = QListWidgetItem()
+                    widget = QFrame()
+                    hl = QHBoxLayout(widget)
+                    hl.setContentsMargins(5, 5, 5, 5)
+
+                    lbl = QLabel(f"{role.upper()}: {login}\nID: {uid}")
+                    lbl.setStyleSheet("font-size: 11px; color: #333; border: none;")
+
+                    btn_ok = QPushButton("✔")
+                    btn_ok.setFixedSize(30, 30)
+                    btn_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+                    btn_ok.setStyleSheet("""
+                        QPushButton { background: #27AE60; color: white; border: none; border-radius: 4px; }
+                        QPushButton:hover { background: #2ECC71; }
+                    """)
+                    btn_ok.clicked.connect(lambda _, u=uid: self.approve_user(u))
+
+                    btn_no = QPushButton("✖")
+                    btn_no.setFixedSize(30, 30)
+                    btn_no.setCursor(Qt.CursorShape.PointingHandCursor)
+                    btn_no.setStyleSheet("""
+                        QPushButton { background: #E74C3C; color: white; border: none; border-radius: 4px; }
+                        QPushButton:hover { background: #C0392B; }
+                    """)
+                    btn_no.clicked.connect(lambda _, u=uid: self.reject_user(u))
+
+                    hl.addWidget(lbl, stretch=1)
+                    hl.addWidget(btn_ok)
+                    hl.addWidget(btn_no)
+
+                    item.setSizeHint(widget.sizeHint())
+                    self.pending_list.addItem(item)
+                    self.pending_list.setItemWidget(item, widget)
+        except Exception as e:
+            print(e)
+
+    def approve_user(self, uid):
+        try:
+            with self.connection.cursor() as c:
+                c.execute("UPDATE users SET is_active = TRUE WHERE id = %s", (str(uid),))
+            self.connection.commit()
+            self.refresh_pending_users()
+            self.refresh_doctors_list()
+            QMessageBox.information(self, "OK", "Użytkownik zatwierdzony.")
+        except Exception as e:
+            QMessageBox.critical(self, "Błąd", str(e))
+
+    def reject_user(self, uid):
+        if QMessageBox.question(self, "Potwierdź", "Usunąć to zgłoszenie?",
+                                QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+            try:
+                with self.connection.cursor() as c:
+                    c.execute("DELETE FROM users WHERE id = %s", (str(uid),))
+                self.connection.commit()
+                self.refresh_pending_users()
+            except Exception as e:
+                QMessageBox.critical(self, "Błąd", str(e))

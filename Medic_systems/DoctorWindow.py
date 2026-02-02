@@ -1,12 +1,12 @@
 import psycopg2
-from datetime import datetime, date, time
+from datetime import datetime, date
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame, QTextEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
-# --- STYL LOKALNY ---
+# --- STYLE LOKALNE ---
 LOCAL_DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }
     QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
@@ -132,7 +132,7 @@ class AddRecommendationWindow(QDialog):
 # --- GŁÓWNE OKNO LEKARZA ---
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
-        # 1. Init BaseWindow (tylko szkielet)
+        # 1. Init BaseWindow
         super().__init__(user_id, "Lekarz")
         self.code_input = None
 
@@ -144,32 +144,13 @@ class DoctorWindow(BaseWindow):
         # A. Pasek boczny
         self.setup_sidebar_widgets()
 
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #34495E;")
-        self.side_layout.addWidget(line)
-        self.side_layout.addSpacing(10)
-
-        # Przyciski
-        zobacz_btn = self.add_button("ZOBACZ KARTĘ")
-        zobacz_btn.clicked.connect(self._show_visit_details)
-
-        self.setup_extra_buttons()
-        self.side_layout.addStretch(1)
-
-        wyloguj_btn = self.add_button("WYLOGUJ")
-        wyloguj_btn.setStyleSheet("""
-            QPushButton { background-color: #C0392B; color: white; border-radius: 6px; padding: 15px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} 
-            QPushButton:hover { background-color: #E74C3C; }
-        """)
-        wyloguj_btn.clicked.connect(self._show_logout_window)
-
         # B. Tabele (Główna treść)
         self.setup_doctor_tables()
 
         # C. Layout
-        # BaseWindow już dodaje side_panel i main_content_frame do main_h_layout.
-        # Ponowne dodawanie tych samych widgetów potrafi powodować problemy z układem/rozmiarem.
+        self.main_h_layout.addWidget(self.side_panel)
+        self.main_h_layout.addWidget(self.main_content_frame)
+        self.setLayout(self.main_h_layout)
 
         # D. Dane (Pobierz wizyty)
         self.refresh_list()
@@ -212,7 +193,7 @@ class DoctorWindow(BaseWindow):
         self.main_v_layout.addWidget(header_today)
 
         self.list_today = QListWidget()
-        self.list_today.setMinimumHeight(150)  # Zabezpieczenie przed znikaniem
+        self.list_today.setMinimumHeight(150)
         self.list_today.setFrameShape(QFrame.Shape.NoFrame)
         self.list_today.setStyleSheet("background-color: transparent;")
         self.list_today.itemClicked.connect(lambda item: self.handle_list_click(item, "today"))
@@ -228,7 +209,7 @@ class DoctorWindow(BaseWindow):
         self.main_v_layout.addWidget(header_future)
 
         self.list_future = QListWidget()
-        self.list_future.setMinimumHeight(150)  # Zabezpieczenie przed znikaniem
+        self.list_future.setMinimumHeight(150)
         self.list_future.setFrameShape(QFrame.Shape.NoFrame)
         self.list_future.setStyleSheet("background-color: transparent;")
         self.list_future.itemClicked.connect(lambda item: self.handle_list_click(item, "future"))
@@ -240,11 +221,13 @@ class DoctorWindow(BaseWindow):
         self.main_v_layout.setStretchFactor(self.list_future, 1)
 
     def setup_sidebar_widgets(self):
+        """Nowy, uporządkowany pasek boczny."""
         doc_name = self.get_doctor_login()
         self.setup_info_widget(f"DR {doc_name}", f"ID: {self.user_id}")
 
+        # Panel wyszukiwania pacjenta
         search_frame = QFrame(self)
-        search_frame.setFixedHeight(160)
+        search_frame.setFixedHeight(150)
         search_frame.setStyleSheet("""
             QFrame { background-color: #34495E; border: 1px solid #415B76; border-radius: 8px; }
             QLabel { color: #ECF0F1; }
@@ -252,8 +235,8 @@ class DoctorWindow(BaseWindow):
 
         layout = QVBoxLayout(search_frame)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         lbl = QLabel("DOSTĘP DO PACJENTA", search_frame)
         lbl.setStyleSheet("font-weight: bold; font-size: 11px; border: none; letter-spacing: 0.5px;")
@@ -285,22 +268,62 @@ class DoctorWindow(BaseWindow):
         layout.addWidget(search_btn)
         self.side_layout.addWidget(search_frame)
 
-    def setup_extra_buttons(self):
-        style = """
-            QPushButton { background-color: #34495E; color: white; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} 
+        # --- SEKCJA PRZYCISKÓW AKCJI (Uporządkowana) ---
+        self.side_layout.addSpacing(15)
+
+        # Linia oddzielająca
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet("color: #5D6D7E;")
+        self.side_layout.addWidget(line)
+
+        lbl_menu = QLabel("MENU AKCJI",
+                          styleSheet="color: #BDC3C7; font-size: 11px; font-weight: bold; margin-top: 10px; margin-bottom: 5px; border:none;")
+        self.side_layout.addWidget(lbl_menu)
+
+        # Definicja stylu dla małych przycisków
+        btn_style = """
+            QPushButton { 
+                background-color: #34495E; 
+                color: white; 
+                border-radius: 4px; 
+                font-weight: 500; 
+                font-size: 13px; 
+                text-align: left; 
+                padding-left: 15px; 
+                border: none;
+                height: 35px;
+            } 
             QPushButton:hover { background-color: #415B76; }
         """
-        btn1 = self.add_button("MOJE WIZYTY")
-        btn1.setStyleSheet(style)
-        btn1.clicked.connect(self.reset_to_my_schedule)
 
-        btn2 = self.add_button("DODAJ ZALECENIA")
-        btn2.setStyleSheet(style)
-        btn2.clicked.connect(self.open_add_recommendations)
+        # Funkcja pomocnicza
+        def add_menu_btn(text, func):
+            btn = QPushButton(text)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(btn_style)
+            btn.clicked.connect(func)
+            self.side_layout.addWidget(btn)
+            self.side_layout.addSpacing(2)
 
-        btn3 = self.add_button("ZLEĆ BADANIE")
-        btn3.setStyleSheet(style)
-        btn3.clicked.connect(self.open_add_lab_test)
+        # Dodajemy przyciski w logicznej kolejności
+        add_menu_btn("MOJE WIZYTY", self.reset_to_my_schedule)
+        add_menu_btn("ZOBACZ KARTĘ", self._show_visit_details)
+        add_menu_btn("DODAJ ZALECENIA", self.open_add_recommendations)
+        add_menu_btn("ZLEĆ BADANIE", self.open_add_lab_test)
+
+        self.side_layout.addStretch(1)
+
+        # Wyloguj na dole
+        wyloguj_btn = QPushButton("WYLOGUJ")
+        wyloguj_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        wyloguj_btn.setFixedHeight(45)
+        wyloguj_btn.setStyleSheet("""
+            QPushButton { background-color: #C0392B; color: white; border-radius: 6px; padding: 10px; font-weight: bold; font-size: 13px; text-align: left; padding-left: 20px; border: none;} 
+            QPushButton:hover { background-color: #E74C3C; }
+        """)
+        wyloguj_btn.clicked.connect(self._show_logout_window)
+        self.side_layout.addWidget(wyloguj_btn)
 
     def reset_to_my_schedule(self):
         """Ukrywa sekcję pacjenta i pokazuje harmonogram lekarza."""
@@ -312,13 +335,6 @@ class DoctorWindow(BaseWindow):
         self.refresh_list()
 
     def refresh_list(self):
-        """Pobiera wizyty lekarza i dzieli je na "dzisiaj" oraz "przyszłe".
-
-        Naprawa:
-        - obsługa strefy czasowej (Warszawa) oraz porównań datetime aware/naive,
-        - odporność na visit_date jako DATE lub TIMESTAMP,
-        - opcjonalnie nie pokazujemy wizyt z przeszłych dni.
-        """
         self.current_selected_frame = None
         self.current_selected_data = None
         self.list_today.clear()
@@ -326,13 +342,10 @@ class DoctorWindow(BaseWindow):
 
         if not self.connection: return
 
-        tz = self._get_local_tz()
-        now_local = datetime.now(tz)
-        today_date = now_local.date()
+        today_date = date.today()
 
         try:
             with self.connection.cursor() as cursor:
-                # Pobieramy WSZYSTKIE wizyty tego lekarza (bez warunku na datę w SQL)
                 query = """
                     SELECT id, visit_date, title, pesel, recommendations
                     FROM visits 
@@ -342,81 +355,36 @@ class DoctorWindow(BaseWindow):
                 cursor.execute(query, (self.user_id,))
                 rows = cursor.fetchall()
 
-                # Dzielimy w Pythonie - stabilnie niezależnie od typu w bazie (DATE/TIMESTAMP)
                 for row in rows:
-                    raw_dt = row[1]
-                    visit_local = self._to_local_datetime(raw_dt)
-                    if not visit_local:
-                        continue
+                    visit_dt = row[1]
+                    v_date = None
+                    if isinstance(visit_dt, datetime):
+                        v_date = visit_dt.date()
+                    elif isinstance(visit_dt, date):
+                        v_date = visit_dt
+                    elif isinstance(visit_dt, str):
+                        try:
+                            v_date = datetime.strptime(visit_dt.split(' ')[0], '%Y-%m-%d').date()
+                        except:
+                            pass
 
-                    v_date = visit_local.date()
-
-                    if v_date < today_date:
-                        # Przeszłość ignorujemy w widoku harmonogramu
-                        continue
+                    if not v_date: continue
 
                     if v_date == today_date:
-                        self.add_single_item(self.list_today, row, visit_local)
-                    else:
-                        self.add_single_item(self.list_future, row, visit_local)
-
-            # Placeholdery, żeby lekarz widział, że lista jest pusta (a nie "zniknęła")
-            if self.list_today.count() == 0:
-                self._add_placeholder(self.list_today, "Brak wizyt na dziś")
-            if self.list_future.count() == 0:
-                self._add_placeholder(self.list_future, "Brak nadchodzących wizyt")
+                        self.add_single_item(self.list_today, row)
+                    elif v_date > today_date:
+                        self.add_single_item(self.list_future, row)
 
         except Exception as e:
             print(f"SQL Error: {e}")
 
-    def _get_local_tz(self):
-        """Zwraca strefę czasową dla porównań (domyślnie Europa/Warszawa)."""
-        try:
-            from zoneinfo import ZoneInfo
-            return ZoneInfo("Europe/Warsaw")
-        except Exception:
-            # Fallback: strefa systemowa
-            return datetime.now().astimezone().tzinfo
-
-    def _to_local_datetime(self, value):
-        """Normalizuje visit_date z bazy do datetime w strefie lokalnej."""
-        tz = self._get_local_tz()
-
-        if isinstance(value, datetime):
-            # timestamp with time zone -> aware
-            if value.tzinfo is not None:
-                return value.astimezone(tz)
-            # timestamp without time zone -> traktujemy jako lokalny
-            return value.replace(tzinfo=tz)
-
-        if isinstance(value, date):
-            # Jeżeli w bazie jest DATE, przyjmijmy koniec dnia, żeby "dzisiaj" nie wpadało do przeszłości.
-            return datetime.combine(value, time(23, 59, 59)).replace(tzinfo=tz)
-
-        return None
-
-    def _add_placeholder(self, widget, text):
-        it = QListWidgetItem(text)
-        it.setFlags(Qt.ItemFlag.NoItemFlags)
-        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        it.setForeground(Qt.GlobalColor.gray)
-        widget.addItem(it)
-
-    def add_single_item(self, widget, row, visit_local_dt=None):
-        """Pomocnicza funkcja dodająca element do listy."""
+    def add_single_item(self, widget, row):
         count = widget.count()
         bg_color = "#FFFFFF" if count % 2 == 0 else "#F8F9F9"
 
-        raw_dt = row[1]
-        if visit_local_dt is None:
-            visit_local_dt = self._to_local_datetime(raw_dt)
-
-        # Format daty do UI
-        if isinstance(raw_dt, datetime):
-            data_str = visit_local_dt.strftime("%Y-%m-%d %H:%M") if visit_local_dt else str(raw_dt)
-        else:
-            # DATE w bazie (bez godziny)
-            data_str = raw_dt.strftime("%Y-%m-%d") if hasattr(raw_dt, "strftime") else str(raw_dt)
+        data_str = str(row[1])
+        if isinstance(row[1], (datetime, date)):
+            data_str = row[1].strftime("%Y-%m-%d %H:%M")
 
         item = QListWidgetItem()
         item.setData(Qt.ItemDataRole.UserRole, (data_str, row[2], str(row[3]), row[4]))
@@ -434,7 +402,7 @@ class DoctorWindow(BaseWindow):
         lbl_date.setStyleSheet("border: none; color: #555; font-weight: bold;")
         hl.addWidget(lbl_date)
 
-        lbl_title = QLabel(row[2])
+        lbl_title = QLabel(str(row[2]))
         lbl_title.setStyleSheet("border: none; color: #2C3E50; font-size: 14px; font-weight: 500;")
         hl.addWidget(lbl_title, stretch=1)
 
@@ -448,7 +416,6 @@ class DoctorWindow(BaseWindow):
         widget.setItemWidget(item, frame)
 
     def load_patient_by_code(self):
-        """Po wpisaniu kodu: Ładuje historię pacjenta na górę."""
         code = self.code_input.text().strip()
         if len(code) != 6:
             QMessageBox.warning(self, "Błąd", "Kod musi mieć 6 cyfr.")
@@ -467,7 +434,6 @@ class DoctorWindow(BaseWindow):
 
                 pesel = res[0]
 
-                # Pobieramy historię pacjenta
                 query_patient = """
                     SELECT id, visit_date, title, pesel, recommendations 
                     FROM visits 
@@ -530,6 +496,16 @@ class DoctorWindow(BaseWindow):
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy.")
             return
 
+        if self.current_selected_data:
+            date_str = self.current_selected_data[0]
+            try:
+                visit_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M").date()
+                if visit_date != date.today():
+                    QMessageBox.warning(self, "Blokada", "Możesz dodawać zalecenia tylko do DZISIEJSZYCH wizyt.")
+                    return
+            except ValueError:
+                pass
+
         visit_id = self.current_selected_frame.property("visit_id")
         data = self.current_selected_data
         current_recs = data[3] if data and len(data) > 3 else ""
@@ -546,6 +522,16 @@ class DoctorWindow(BaseWindow):
         if not self.current_selected_frame:
             QMessageBox.warning(self, "Uwaga", "Najpierw wybierz wizytę z listy.")
             return
+
+        if self.current_selected_data:
+            date_str = self.current_selected_data[0]
+            try:
+                visit_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M").date()
+                if visit_date != date.today():
+                    QMessageBox.warning(self, "Blokada", "Możesz zlecać badania tylko do DZISIEJSZYCH wizyt.")
+                    return
+            except ValueError:
+                pass
 
         visit_id = self.current_selected_frame.property("visit_id")
         if not visit_id: return
