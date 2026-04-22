@@ -15,7 +15,7 @@ class ClickableCard(QFrame):
         self.checkbox = checkbox
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(80)
-        self.setStyleSheet("background-color: white; border: 1px solid #E0E0E0; border-radius: 6px;")
+        self.setObjectName("adminDayCard")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -41,8 +41,8 @@ class AdminWindow(BaseWindow):
         left_layout.setContentsMargins(0, 0, 10, 0)
 
         left_layout.addWidget(
-            QLabel("ZARZĄDZANIE GRAFIKIEM", styleSheet="color: #2C3E50; font-size: 18px; font-weight: bold;"))
-        self.sub_header = QLabel("Wybierz lekarza z paska bocznego.", styleSheet="color: #7F8C8D; margin-bottom: 10px;")
+            QLabel("ZARZĄDZANIE GRAFIKIEM", styleSheet="font-size: 18px; font-weight: bold;"))
+        self.sub_header = QLabel("Wybierz lekarza z paska bocznego.", styleSheet="margin-bottom: 10px;")
         left_layout.addWidget(self.sub_header)
 
         self.scroll = QScrollArea()
@@ -73,14 +73,14 @@ class AdminWindow(BaseWindow):
         main_content_layout.addWidget(left_container, stretch=3)
 
         right_container = QFrame()
-        right_container.setStyleSheet("background-color: white; border-radius: 8px; border: 1px solid #BDC3C7;")
+        right_container.setObjectName("adminPanelCard")
         right_layout = QVBoxLayout(right_container)
 
         right_layout.addWidget(QLabel("OCZEKUJĄCE REJESTRACJE",
                                       styleSheet="color: #E67E22; font-weight: bold; font-size: 14px; border:none;"))
 
         self.pending_list = QListWidget()
-        self.pending_list.setStyleSheet("border: none;")
+        self.pending_list.setStyleSheet("border: none; background: transparent;")
         right_layout.addWidget(self.pending_list)
 
         btn_refresh = QPushButton("Odśwież")
@@ -109,6 +109,7 @@ class AdminWindow(BaseWindow):
         self.doctors_list.itemClicked.connect(self.load_schedule_for_doctor)
         self.side_layout.addWidget(self.doctors_list)
         self.side_layout.addStretch()
+        self.add_settings_button()
 
         wyloguj = self.add_button("WYLOGUJ")
         wyloguj.setStyleSheet("""
@@ -120,7 +121,7 @@ class AdminWindow(BaseWindow):
     def create_day_rows(self):
         for day_idx in range(5):
             chk = QCheckBox(DAYS_MAP[day_idx])
-            chk.setStyleSheet("font-weight: bold; color: #2C3E50; border: none; background: transparent;")
+            chk.setStyleSheet("font-weight: bold; border: none; background: transparent;")
 
             card = ClickableCard(chk)
 
@@ -226,11 +227,12 @@ class AdminWindow(BaseWindow):
                 for uid, login, role in rows:
                     item = QListWidgetItem()
                     widget = QFrame()
+                    widget.setObjectName("adminPendingItem")
                     hl = QHBoxLayout(widget)
                     hl.setContentsMargins(5, 5, 5, 5)
 
                     lbl = QLabel(f"{role.upper()}: {login}\nID: {uid}")
-                    lbl.setStyleSheet("font-size: 11px; color: #333; border: none;")
+                    lbl.setStyleSheet("font-size: 11px; border: none;")
 
                     btn_ok = QPushButton("✔")
                     btn_ok.setFixedSize(30, 30)

@@ -49,6 +49,13 @@ QDialog { background-color: #F8F9FA; }
 QFrame  { background-color: transparent; }
 QLabel  { color: #2C3E50; }
 
+QFrame#adminPanelCard, QFrame#adminDayCard, QFrame#adminPendingItem {
+    background-color: #FFFFFF;
+    border: 1px solid #BDC3C7;
+    border-radius: 8px;
+}
+
+
 QLineEdit, QTextEdit, QComboBox {
     background-color: #FFFFFF; color: #2C3E50;
     border: 1px solid #BDC3C7; border-radius: 4px; padding: 6px;
@@ -103,6 +110,13 @@ QWidget { background-color: #1A252F; color: #D5D8DC; }
 QDialog { background-color: #1C2833; }
 QFrame  { background-color: transparent; }
 QLabel  { color: #D5D8DC; }
+
+QFrame#adminPanelCard, QFrame#adminDayCard, QFrame#adminPendingItem {
+    background-color: #22303C;
+    border: 1px solid #5D6D7E;
+    border-radius: 8px;
+}
+
 
 QLineEdit, QTextEdit, QComboBox {
     background-color: #2E4053; color: #D5D8DC;
@@ -163,6 +177,13 @@ QWidget { background-color: #000000; color: #FFFFFF; }
 QDialog { background-color: #000000; }
 QFrame  { background-color: transparent; border-color: #FFFFFF; }
 QLabel  { color: #FFFFFF; font-weight: bold; }
+
+QFrame#adminPanelCard, QFrame#adminDayCard, QFrame#adminPendingItem {
+    background-color: #000000;
+    border: 2px solid #FFFF00;
+    border-radius: 0px;
+}
+
 
 QLineEdit, QTextEdit, QComboBox {
     background-color: #000000; color: #FFFFFF;
