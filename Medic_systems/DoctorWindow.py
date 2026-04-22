@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame, QTextEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
-from BaseWindow import BaseWindow, conn_str
+from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
 LOCAL_DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }
@@ -292,6 +292,7 @@ class DoctorWindow(BaseWindow):
         add_menu_btn("ZLEĆ BADANIE", self.open_add_lab_test)
 
         self.side_layout.addStretch(1)
+        self.add_settings_button()  # ← dodaj tę linię
 
         wyloguj_btn = QPushButton("WYLOGUJ")
         wyloguj_btn.setCursor(Qt.CursorShape.PointingHandCursor)

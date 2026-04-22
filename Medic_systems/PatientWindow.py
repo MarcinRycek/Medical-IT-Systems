@@ -1,4 +1,5 @@
 import random
+import re
 import psycopg2
 from functools import partial
 from datetime import datetime, timedelta, time, date
@@ -11,10 +12,10 @@ except:
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QFrame, QPushButton,
                                QMessageBox, QListWidgetItem, QHBoxLayout, QScrollArea,
                                QWidget, QLineEdit, QComboBox, QCalendarWidget,
-                               QGridLayout, QListWidget)
+                               QGridLayout, QTableView, QTextEdit, QListWidget)
 from PySide6.QtCore import Qt, QSize, QDate
-from PySide6.QtGui import QBrush, QColor, QTextCharFormat
-from BaseWindow import BaseWindow, conn_str
+from PySide6.QtGui import QBrush, QColor, QPalette, QTextCharFormat
+from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
 
 class BookVisitWindow(QDialog):
@@ -92,10 +93,27 @@ class BookVisitWindow(QDialog):
         self.time_slots_area.setWidget(self.time_slots_content)
         layout.addWidget(self.time_slots_area)
 
-        layout.addWidget(QLabel("4. Cel wizyty:"))
-        self.title_in = QLineEdit()
-        self.title_in.setPlaceholderText("Np. Ból gardła")
-        layout.addWidget(self.title_in)
+        # layout.addWidget(QLabel("4. Cel wizyty:"))
+        # self.title_in = QLineEdit()
+        # self.title_in.setPlaceholderText("Np. Ból gardła")
+        # layout.addWidget(self.title_in)
+        # --- ZMIANA: QComboBox zamiast zwykłego pola tekstowego ---
+        layout.addWidget(QLabel("4. Typ wizyty:"))
+        self.type_combo = QComboBox()
+        self.type_combo.addItems([
+            "Konsultacja lekarska",
+            "Wypisanie recepty (kontynuacja)",
+            "Skierowanie na badania",
+            "Wizyta kontrolna",
+            "Inne"
+        ])
+        layout.addWidget(self.type_combo)
+
+        layout.addWidget(QLabel("5. Dodatkowy opis (opcjonalnie):"))
+        self.desc_in = QLineEdit()
+        self.desc_in.setPlaceholderText("Np. Ból gardła, potrzebny lek X...")
+        layout.addWidget(self.desc_in)
+        # ---------------------------------------------------------
 
         self.save_btn = QPushButton("POTWIERDŹ REZERWACJĘ")
         self.save_btn.setFixedHeight(50)
@@ -285,9 +303,22 @@ class BookVisitWindow(QDialog):
             self.selected_time = None
             self.save_btn.setEnabled(False)
 
+    # def save(self):
+    #     title = self.title_in.text().strip()
+    #     if not title: return
+    #     doc_id = self.doctor_combo.currentData()
     def save(self):
-        title = self.title_in.text().strip()
-        if not title: return
+            # --- ZMIANA: Łączenie typu wizyty z opcjonalnym opisem ---
+        visit_type = self.type_combo.currentText()
+        desc = self.desc_in.text().strip()
+
+            # Jeśli pacjent podał opis, formatujemy to jako: "Typ wizyty - Opis"
+        if desc:
+                title = f"{visit_type} - {desc}"
+        else:
+                title = visit_type
+            # ---------------------------------------------------------
+
         doc_id = self.doctor_combo.currentData()
         if not doc_id or not self.selected_time: return
 
@@ -358,6 +389,7 @@ class PatientWindow(BaseWindow):
         self.side_layout.addWidget(f, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.side_layout.addStretch()
+        self.add_settings_button()  # ← dodaj tę linię
 
         wyloguj = self.add_button("WYLOGUJ")
         wyloguj.setStyleSheet("""

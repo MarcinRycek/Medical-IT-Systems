@@ -18,23 +18,26 @@ class LoginWindow(QWidget):
         self.setWindowTitle("MedEX-POL - Logowanie")
         self.resize(500, 600)
 
+        # --- POPRAWIONE STYLE (BARDZIEJ ZWARTE KOMUNIKATY) ---
         self.setStyleSheet("""
             QWidget { 
                 background-color: #ECF0F1; 
                 font-family: 'Segoe UI', sans-serif;
             }
 
+            /* --- STYL DLA OKIENEK Z BŁĘDAMI (QMessageBox) --- */
             QMessageBox {
                 background-color: #FFFFFF;
                 border: 1px solid #BDC3C7;
             }
 
+            /* Usunięto min-width z QLabel, aby tekst nie "uciekał" */
             QMessageBox QLabel {
                 color: #2C3E50;       
                 font-size: 13px;      
                 font-weight: 500;
                 background-color: transparent;
-                padding: 5px;
+                padding: 5px;         /* Lekki odstęp dla czytelności */
             }
 
             QMessageBox QPushButton {
@@ -43,7 +46,7 @@ class LoginWindow(QWidget):
                 font-weight: bold;
                 border-radius: 4px;
                 padding: 6px 20px;
-                min-width: 60px;
+                min-width: 60px;      /* Zmniejszona szerokość przycisku */
                 margin: 5px;
             }
             QMessageBox QPushButton:hover {
@@ -162,6 +165,7 @@ class LoginWindow(QWidget):
                         else:
                             QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło!")
                     except ValueError:
+                        # Fallback dla haseł w plain-text (np. admin)
                         if password == db_hash:
                             self.open_dashboard(role, user_id)
                         else:

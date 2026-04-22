@@ -1,10 +1,13 @@
 import psycopg2
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel,
+from datetime import datetime
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QFrame, QTextEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
 
+
+# --- OKNO EDYCJI WYNIKU ---
 class EditResultWindow(QDialog):
     def __init__(self, test_id, test_name, parent=None):
         super().__init__(parent)
@@ -26,6 +29,7 @@ class EditResultWindow(QDialog):
 
         btn = QPushButton("ZAPISZ I ZAKOŃCZ")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        # --- ZMIANA: Dodano efekt HOVER ---
         btn.setStyleSheet("""
             QPushButton { background-color: #27AE60; color: white; font-weight: bold; border-radius: 5px; padding: 10px; border: none; }
             QPushButton:hover { background-color: #2ECC71; }
@@ -49,6 +53,7 @@ class EditResultWindow(QDialog):
             QMessageBox.critical(self, "Błąd", str(e))
 
 
+# --- GŁÓWNE OKNO LABORANTA ---
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):
         super().__init__(user_id, "Laborant")
@@ -83,6 +88,7 @@ class LaborantWindow(BaseWindow):
 
         self.side_layout.addSpacing(20)
 
+        # --- ZMIANA: Dodano style HOVER do przycisków ---
         btn_style = """
             QPushButton { background-color: #E67E22; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px; border: none; }
             QPushButton:hover { background-color: #D35400; }
@@ -95,6 +101,7 @@ class LaborantWindow(BaseWindow):
         self.side_layout.addSpacing(10)
 
         b2 = self.add_button("ZOBACZ KARTĘ")
+        # Nadajemy styl również tutaj, aby był spójny
         b2.setStyleSheet("""
             QPushButton { background-color: #34495E; color: white; border-radius: 6px; font-weight: bold; padding: 15px; text-align: left; padding-left: 20px; border: none; }
             QPushButton:hover { background-color: #415B76; }
@@ -102,6 +109,7 @@ class LaborantWindow(BaseWindow):
         b2.clicked.connect(self._show_visit_details)
 
         self.side_layout.addStretch()
+        self.add_settings_button()  # ← dodaj tę linię
 
         wyloguj = self.add_button("WYLOGUJ")
         wyloguj.setStyleSheet("""
