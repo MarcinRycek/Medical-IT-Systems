@@ -28,40 +28,59 @@ class BookVisitWindow(QDialog):
         self.resize(520, 780)
 
         self.setStyleSheet("""
-            QDialog { background-color: #F8F9FA; }
-            QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
+                    QDialog { background-color: #F8F9FA; }
+                    QLabel { color: #2C3E50; font-size: 13px; font-weight: bold; }
 
-            QLineEdit, QComboBox { 
-                background-color: white; 
-                border: 1px solid #BDC3C7; 
-                border-radius: 4px;
-                padding: 8px; 
-                color: #2C3E50;
-            }
+                    QLineEdit, QComboBox { 
+                        background-color: white; 
+                        border: 1px solid #BDC3C7; 
+                        border-radius: 4px;
+                        padding: 8px; 
+                        color: #2C3E50;
+                    }
 
-            QComboBox QAbstractItemView {
-                background-color: white;
-                color: #2C3E50;
-                selection-background-color: #95A5A6;
-                selection-color: white;
-            }
+                    QComboBox QAbstractItemView {
+                        background-color: white;
+                        color: #2C3E50;
+                        selection-background-color: #95A5A6;
+                        selection-color: white;
+                    }
 
-            QCalendarWidget QWidget#qt_calendar_navigationbar { 
-                background-color: #34495E; 
-                color: white;
-                font-weight: bold;
-            }
-            QCalendarWidget QToolButton {
-                color: white;
-                icon-size: 25px;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                color: #2C3E50;
-                background-color: white;
-                selection-background-color: #95A5A6;
-                selection-color: white;
-            }
-        """)
+                    /* --- ZMIENIONA SEKCJA KALENDARZA --- */
+                    QCalendarWidget QWidget#qt_calendar_navigationbar { 
+                        background-color: #34495E; 
+                    }
+
+                    QCalendarWidget QToolButton {
+                        color: white;
+                        background-color: transparent; /* Wymusza przezroczyste tło na pasku */
+                        font-weight: bold;
+                        icon-size: 25px;
+                        border: none;
+                    }
+
+                    QCalendarWidget QToolButton:hover {
+                        background-color: #2C3E50; /* Ciemniejsze podświetlenie po najechaniu */
+                        border-radius: 4px;
+                    }
+
+                    QCalendarWidget QSpinBox {
+                        background-color: white; /* Białe tło dla pola wyboru roku */
+                        color: #2C3E50; /* Ciemny, czytelny tekst dla roku */
+                        border: 1px solid #BDC3C7;
+                        border-radius: 4px;
+                        padding: 2px;
+                        font-weight: bold;
+                    }
+
+                    QCalendarWidget QAbstractItemView:enabled {
+                        color: #2C3E50;
+                        background-color: white;
+                        selection-background-color: #95A5A6;
+                        selection-color: white;
+                    }
+                    /* ----------------------------------- */
+                """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -352,6 +371,18 @@ class BookVisitWindow(QDialog):
                 subj = "Potwierdzenie rezerwacji wizyty"
                 body = f"Umówiono nową wizytę.\nData: {d_str}\nLekarz: dr {doc_name}\nCel: {title}"
                 send_email(patient_email, subj, body)
+
+                cur.execute("SELECT email, login FROM users WHERE id = %s", (doc_id,))
+                doc_info = cur.fetchone()
+
+                if doc_info and doc_info[0]:
+                    doc_email = doc_info[0]
+                    doc_login = doc_info[1]
+
+                    doc_subj = "Nowa rezerwacja wizyty w systemie"
+                    doc_body = f"Dzień dobry dr {doc_login},\n\nNowy pacjent umówił wizytę w Twoim grafiku.\nData: {d_str}\nCel: {title}\nPESEL pacjenta: {self.patient_pesel}"
+                    send_email(doc_email, doc_subj, doc_body)
+
             conn.commit()
             conn.close()
 
@@ -596,6 +627,18 @@ class PatientWindow(BaseWindow):
                             (self.user_id, code, exp))
             conn.commit()
             self.code_label.setText(code)
+
+            # --- NOWE: WYSYŁKA E-MAILA Z KODEM ---
+            try:
+                cur.execute("SELECT email FROM users WHERE id=%s", (self.user_id,))
+                user_email = cur.fetchone()
+                if user_email and user_email[0]:
+                    body = f"Twój nowy kod udostępniania dokumentacji medycznej to: {code}.\nKod jest ważny przez 15 minut."
+                    send_email(user_email[0], "MedEX-POL - Kod dostępu", body)
+            except Exception as e:
+                print(f"Błąd podczas wysyłki e-maila: {e}")
+            # -------------------------------------
+
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Err", str(e))

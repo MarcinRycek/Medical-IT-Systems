@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
-
+from EmailService import send_email
 
 # --- OKNO EDYCJI WYNIKU ---
 class EditResultWindow(QDialog):
@@ -44,15 +44,38 @@ class EditResultWindow(QDialog):
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
+
+            # Zapis do bazy
             cursor.execute("UPDATE lab_tests SET description = %s WHERE id = %s", (text, self.test_id))
+
+            # --- WYSYŁKA E-MAILA Z WYNIKIEM ---
+            try:
+                # POPRAWKA: używamy v.pesel zamiast v.patient_id
+                cursor.execute("""
+                                SELECT u.email 
+                                FROM lab_tests lt
+                                JOIN visits v ON lt.visit_id = v.id
+                                JOIN users u ON v.pesel = u.id
+                                WHERE lt.id = %s
+                            """, (self.test_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    # POPRAWKA: używamy zmiennej {text} zamiast {desc}
+                    body = f"Laboratorium wprowadziło nowe wyniki Twoich badań.\n\nWyniki:\n{text}"
+                    send_email(row[0], "MedEX-POL - Nowe wyniki badań", body)
+            except Exception as e:
+                print(f"Błąd wysyłania e-maila: {e}")
+            # ----------------------------------------
+
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sukces", "Wynik zapisany.")
+
+            # POPRAWKA: Najpierw komunikat, potem jedno accept()
+            QMessageBox.information(self, "Sukces", "Wynik zapisany i wysłano powiadomienie.")
             self.accept()
+
         except Exception as e:
-            QMessageBox.critical(self, "Błąd", str(e))
-
-
+            QMessageBox.critical(self, "Błąd", f"Wystąpił błąd podczas zapisu: {e}")
 # --- GŁÓWNE OKNO LABORANTA ---
 class LaborantWindow(BaseWindow):
     def __init__(self, user_id):

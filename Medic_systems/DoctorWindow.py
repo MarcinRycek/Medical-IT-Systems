@@ -5,6 +5,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QListWidgetItem, QHBoxLayout, QListWidget)
 from PySide6.QtCore import Qt, QSize
 from BaseWindow import BaseWindow, conn_str, DIALOG_STYLE
+from EmailService import send_email
+
 
 LOCAL_DIALOG_STYLE = """
     QDialog { background-color: #F8F9FA; }
@@ -66,15 +68,34 @@ class AddLabTestWindow(QDialog):
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
+
+            # 1. Zapis badania do bazy
             cursor.execute("INSERT INTO lab_tests (visit_id, title) VALUES (%s, %s)",
                            (self.visit_id, title))
+
+            # 2. Wysyłka maila o ZLECONYM BADANIU
+            try:
+                # POPRAWKA: użyto v.pesel
+                cursor.execute("""
+                                SELECT u.email 
+                                FROM visits v 
+                                JOIN users u ON v.pesel = u.id 
+                                WHERE v.id = %s
+                            """, (self.visit_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    # POPRAWKA: inna treść maila, używa zmiennej {title}
+                    body = f"Twój lekarz właśnie zlecił nowe badanie: {title}.\nSkontaktuj się z laboratorium."
+                    send_email(row[0], "MedEX-POL - Skierowanie na badanie", body)
+            except Exception as e:
+                print(f"Błąd wysyłania e-maila: {e}")
+
             conn.commit()
             conn.close()
             QMessageBox.information(self, "Sukces", "Badanie zostało zlecone.")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Błąd Bazy", str(e))
-
 
 class AddRecommendationWindow(QDialog):
     def __init__(self, visit_id, current_recs, parent=None):
@@ -116,15 +137,34 @@ class AddRecommendationWindow(QDialog):
         try:
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
+
+            # 1. Zapis zaleceń do bazy
             cursor.execute("UPDATE visits SET recommendations = %s WHERE id = %s",
                            (text, self.visit_id))
+
+            # 2. Wysyłka maila o ZALECENIACH
+            try:
+                # POPRAWKA: użyto v.pesel
+                cursor.execute("""
+                                SELECT u.email 
+                                FROM visits v 
+                                JOIN users u ON v.pesel = u.id 
+                                WHERE v.id = %s
+                            """, (self.visit_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    # POPRAWKA: używamy zmiennej {text} wpisanej przez lekarza
+                    body = f"Twój lekarz właśnie zaktualizował zalecenia po wizycie.\n\nTreść zaleceń:\n{text}"
+                    send_email(row[0], "MedEX-POL - Nowe zalecenia medyczne", body)
+            except Exception as e:
+                print(f"Błąd wysyłania e-maila: {e}")
+
             conn.commit()
             conn.close()
             QMessageBox.information(self, "Sukces", "Zalecenia zostały zapisane.")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Błąd Bazy", str(e))
-
 
 class DoctorWindow(BaseWindow):
     def __init__(self, user_id):
