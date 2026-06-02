@@ -1,11 +1,41 @@
 import psycopg2
 import bcrypt
 from PySide6.QtWidgets import (QWidget, QLineEdit, QPushButton, QVBoxLayout,
-                               QMessageBox, QLabel, QComboBox, QFrame)
+                               QMessageBox, QLabel, QComboBox, QDialog, QFrame)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 from BaseWindow import conn_str
+import random
+from EmailService import send_email # <-- Import usługi e-mail
 
+
+class VerificationDialog(QDialog):
+    def __init__(self, expected_code, parent=None):
+        super().__init__(parent)
+        self.expected_code = str(expected_code)
+        self.setWindowTitle("Weryfikacja E-mail")
+        self.setFixedSize(300, 150)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Na podany adres e-mail wysłano 6-cyfrowy kod."))
+
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("Wpisz kod weryfikacyjny")
+        self.code_input.setMaxLength(6)
+        self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.code_input)
+
+        verify_btn = QPushButton("ZATWIERDŹ")
+        verify_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        verify_btn.setStyleSheet("background-color: #3498DB; color: white; font-weight: bold; padding: 8px;")
+        verify_btn.clicked.connect(self.verify)
+        layout.addWidget(verify_btn)
+
+    def verify(self):
+        if self.code_input.text().strip() == self.expected_code:
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Błąd", "Nieprawidłowy kod weryfikacyjny!")
 
 class RegisterWindow(QWidget):
     def __init__(self):
@@ -77,6 +107,14 @@ class RegisterWindow(QWidget):
         self.id_box.setMaxLength(11)
         card_layout.addWidget(self.id_box)
 
+        lbl_email = QLabel("E-mail:")
+        lbl_email.setStyleSheet(label_style)
+        card_layout.addWidget(lbl_email)
+
+        self.email_box = QLineEdit()
+        self.email_box.setPlaceholderText("Twój adres e-mail")
+        card_layout.addWidget(self.email_box)
+
         lbl_login = QLabel("Login:")
         lbl_login.setStyleSheet(label_style)
         card_layout.addWidget(lbl_login)
@@ -131,6 +169,7 @@ class RegisterWindow(QWidget):
 
     def register_user(self):
         user_id = self.id_box.text().strip()
+        email = self.email_box.text().strip()
         login = self.login_box.text().strip()
         password = self.password_box.text().strip()
         role_pl = self.role_combo.currentText()
@@ -138,8 +177,12 @@ class RegisterWindow(QWidget):
         role_map = {"Pacjent": "patient", "Lekarz": "doctor", "Laborant": "laborant"}
         db_role = role_map.get(role_pl, "patient")
 
-        if not user_id or not login or not password:
+        if not user_id or not login or not password or not email:
             QMessageBox.warning(self, "Błąd", "Wypełnij wszystkie pola!")
+            return
+
+        if "@" not in email or "." not in email:
+            QMessageBox.warning(self, "Błąd", "Podaj poprawny adres e-mail!")
             return
 
         if role_pl == "Pacjent":
@@ -158,32 +201,35 @@ class RegisterWindow(QWidget):
             conn = psycopg2.connect(conn_str)
             cursor = conn.cursor()
 
-            cursor.execute("SELECT id FROM users WHERE login = %s", (login,))
+            # Dodaj sprawdzenie unikalności e-maila
+            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
             if cursor.fetchone():
-                QMessageBox.warning(self, "Błąd", "Taki login jest już zajęty!")
+                QMessageBox.warning(self, "Błąd", "Ten e-mail jest już przypisany do innego konta!")
                 return
 
-            cursor.execute("SELECT id FROM users WHERE id = %s", (user_id,))
-            if cursor.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim ID już istnieje!")
+            # Zamiast od razu zapisywać, wysyłamy kod weryfikacyjny
+            verification_code = random.randint(100000, 999999)
+            subject = "MedEX-POL - Kod weryfikacyjny"
+            body = f"Twój kod weryfikacyjny do rejestracji to: {verification_code}"
+
+            if not send_email(email, subject, body):
+                QMessageBox.critical(self, "Błąd", "Nie udało się wysłać e-maila z kodem.")
                 return
 
-            hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            # Otwórz okno weryfikacji
+            dialog = VerificationDialog(verification_code, self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # Weryfikacja udana -> Zapisz do bazy
+                hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-            cursor.execute(
-                "INSERT INTO users (id, login, password, role, is_active) VALUES (%s, %s, %s, %s, %s)",
-                (user_id, login, hashed, db_role, is_active)
-            )
-
-            conn.commit()
-
-            if is_active:
-                QMessageBox.information(self, "Sukces", "Konto utworzone pomyślnie!\nMożesz się zalogować.")
-            else:
-                QMessageBox.information(self, "Sukces",
-                                        "Konto utworzone!\nCzeka na zatwierdzenie przez Administratora.")
-
-            self.show_login()
+                # Zmodyfikowane zapytanie INSERT uwzględniające email
+                cursor.execute(
+                    "INSERT INTO users (id, login, password, role, is_active, email) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, login, hashed, db_role, is_active, email)
+                )
+                conn.commit()
+                QMessageBox.information(self, "Sukces", "Konto utworzone pomyślnie i zweryfikowane!")
+                self.show_login()
 
         except Exception as e:
             if conn: conn.rollback()

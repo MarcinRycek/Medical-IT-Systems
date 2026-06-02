@@ -3,6 +3,7 @@ import re
 import psycopg2
 from functools import partial
 from datetime import datetime, timedelta, time, date
+from EmailService import send_email
 
 try:
     LOCAL_TZ = datetime.now().astimezone().tzinfo
@@ -341,6 +342,16 @@ class BookVisitWindow(QDialog):
                 "INSERT INTO visits (visit_date, title, pesel, doctor_id) VALUES (%s, %s, %s, %s)",
                 (vd_naive, title, self.patient_pesel, doc_id)
             )
+            cur.execute("SELECT email FROM users WHERE id = %s", (self.patient_pesel,))
+            row = cur.fetchone()
+            if row and row[0]:
+                patient_email = row[0]
+                cur.execute("SELECT login FROM users WHERE id = %s", (doc_id,))
+                doc_name = cur.fetchone()[0]
+
+                subj = "Potwierdzenie rezerwacji wizyty"
+                body = f"Umówiono nową wizytę.\nData: {d_str}\nLekarz: dr {doc_name}\nCel: {title}"
+                send_email(patient_email, subj, body)
             conn.commit()
             conn.close()
 
